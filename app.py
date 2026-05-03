@@ -179,15 +179,19 @@ def layout(title, body, authed=False):
     </head>
     <body>
       <header class="topbar">
-        <a class="brand" href="/">{APP_NAME}</a>
+        <a class="brand" href="/">
+          <span class="brand-mark">A</span>
+          <span><strong>AUREA</strong><small>Packaging Supply Pty Ltd</small></span>
+        </a>
         <nav>
-          <a href="/">Catalogue</a>
-          <a href="/quote">Request Quote</a>
+          <a href="/">View Products</a>
+          <a href="/#contact">Contact Us</a>
+          <a class="nav-cta" href="/quote">Request Quote</a>
           {admin_links}
         </nav>
       </header>
       <main>{body}</main>
-      <footer>Disposable coffee cup sales and inventory MVP for Australian B2B suppliers.</footer>
+      <footer>AUREA Packaging Supply Pty Ltd &middot; Melbourne, Australia &middot; info@aureapackaging.com.au</footer>
     </body>
     </html>"""
 
@@ -271,37 +275,120 @@ class App(BaseHTTPRequestHandler):
         self.end_headers()
 
     def catalogue(self):
-        with db() as conn:
-            products = conn.execute(
-                "SELECT sku, name, size, qty_per_carton, sell_price FROM products WHERE active = 1 ORDER BY sku"
-            ).fetchall()
-        cards = ""
-        for p in products:
-            cards += f"""
-            <article class="product-card">
-              <div class="sku">{esc(p["sku"])}</div>
-              <h2>{esc(p["name"])}</h2>
+        body = """
+        <section class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
+            <h1>Premium Kraft Coffee Cups with Lids</h1>
+            <p>Premium quality packaging solutions for cafes, takeaway shops and coffee businesses across Australia.</p>
+            <div class="hero-actions">
+              <a class="button primary" href="/quote">Request a Quote</a>
+              <a class="button ghost" href="#contact">Contact Us</a>
+              <a class="button ghost" href="#products">View Products</a>
+            </div>
+          </div>
+          <aside class="hero-badge">
+            <span>Premium Insulation</span>
+            Keeps drinks hot longer
+          </aside>
+        </section>
+
+        <section class="benefits" aria-label="Key benefits">
+          <article><strong>Sustainable</strong><span>Eco-friendly materials</span></article>
+          <article><strong>Strong &amp; Reliable</strong><span>Durable and leak-proof design</span></article>
+          <article><strong>Perfect Fit</strong><span>90mm universal lid compatible</span></article>
+          <article><strong>Premium Insulation</strong><span>Keeps drinks hot longer</span></article>
+        </section>
+
+        <section id="products" class="section-head">
+          <p class="eyebrow">Wholesale carton pricing</p>
+          <h2>Premium Kraft Coffee Cups</h2>
+          <p>Clear carton pricing for Australian cafes, takeaway shops and coffee businesses.</p>
+        </section>
+
+        <section class="pricing-grid">
+          <article class="product-card featured">
+            <p class="sku">Single Wall Kraft Coffee Cup</p>
+            <h2>1000 cups in a box</h2>
+            <div class="price-list">
+              <div><span>8 oz</span><strong>$49.90</strong></div>
+              <div><span>12 oz</span><strong>$61.90</strong></div>
+              <div><span>16 oz</span><strong>$79.90</strong></div>
+              <div><span>Lids fit all</span><strong>$39.90</strong></div>
+            </div>
+            <a class="button primary" href="/quote">Request Single Wall Pricing</a>
+          </article>
+
+          <article class="product-card featured">
+            <p class="sku">Double Wall Kraft Coffee Cup</p>
+            <h2>500 cups in a box</h2>
+            <div class="price-list">
+              <div><span>8 oz</span><strong>$45.00</strong></div>
+              <div><span>12 oz</span><strong>$50.00</strong></div>
+              <div><span>16 oz</span><strong>$60.00</strong></div>
+              <div><span>Lids fit all</span><strong>$45.00</strong></div>
+            </div>
+            <a class="button primary" href="/quote">Request Double Wall Pricing</a>
+          </article>
+
+          <article class="promo-card">
+            <p class="eyebrow">Special promotion</p>
+            <h2>Buy one box of each size coffee cups plus two boxes of lids, get 250 lids for free.</h2>
+            <p>Be quick, limited time only.</p>
+            <a class="button ghost" href="/quote">Claim Promotion</a>
+          </article>
+        </section>
+
+        <section class="spec-section">
+          <div class="section-head">
+            <p class="eyebrow">Product specifications</p>
+            <h2>Designed for a 90mm Universal Lid</h2>
+          </div>
+
+          <div class="spec-grid">
+            <article class="spec-card">
+              <h3>Single Wall Kraft Coffee Cup</h3>
               <dl>
-                <div><dt>Size</dt><dd>{esc(p["size"])}</dd></div>
-                <div><dt>Carton</dt><dd>{esc(p["qty_per_carton"])} units</dd></div>
-                <div><dt>Indicative</dt><dd>{money(p["sell_price"])} / carton</dd></div>
+                <div><dt>8 oz</dt><dd>90mm top &middot; 85.5mm height &middot; 56.5mm bottom</dd></div>
+                <div><dt>12 oz</dt><dd>90mm top &middot; 116mm height &middot; 58mm bottom</dd></div>
+                <div><dt>16 oz</dt><dd>90mm top &middot; 136mm height &middot; 58mm bottom</dd></div>
               </dl>
             </article>
-            """
-        body = f"""
-        <section class="hero">
-          <div>
-            <p class="eyebrow">Australia B2B coffee cup supply</p>
-            <h1>Disposable cups, lids and carton pricing for cafes.</h1>
-            <p>Browse core products and request a quote based on your expected monthly volume.</p>
-            <a class="button primary" href="/quote">Request a quote</a>
+
+            <article class="spec-card">
+              <h3>Double Wall Kraft Coffee Cup</h3>
+              <dl>
+                <div><dt>8 oz</dt><dd>90mm top &middot; 85.5mm height &middot; 56.5mm bottom</dd></div>
+                <div><dt>12 oz</dt><dd>90mm top &middot; 116mm height &middot; 58mm bottom</dd></div>
+                <div><dt>16 oz</dt><dd>90mm top &middot; 136mm height &middot; 58mm bottom</dd></div>
+              </dl>
+            </article>
+
+            <article class="spec-card lid-card">
+              <h3>Lid</h3>
+              <dl>
+                <div><dt>Type</dt><dd>90mm plastic lid</dd></div>
+                <div><dt>Height</dt><dd>23mm</dd></div>
+                <div><dt>Fit</dt><dd>90mm universal lid</dd></div>
+              </dl>
+            </article>
           </div>
         </section>
-        <section class="section-head">
-          <h2>Product Catalogue</h2>
-          <p>Simple public catalogue for cafes and takeaway shops.</p>
+
+        <section id="contact" class="contact-section">
+          <div>
+            <p class="eyebrow">Your trusted partner</p>
+            <h2>Premium packaging supply across Australia</h2>
+            <p>Speak with Stone Wang for product availability, bulk carton pricing and cafe supply requirements.</p>
+          </div>
+          <div class="contact-card">
+            <strong>Stone Wang</strong>
+            <a href="tel:0497278099">0497278099</a>
+            <a href="mailto:info@aureapackaging.com.au">info@aureapackaging.com.au</a>
+            <a href="https://www.aureapackaging.com.au">www.aureapackaging.com.au</a>
+            <span>Melbourne, Australia</span>
+          </div>
         </section>
-        <section class="grid">{cards}</section>
         """
         self.respond(layout("Product Catalogue", body, self.is_authed()))
 
