@@ -1,5 +1,5 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlencode, urlparse
+from urllib.parse import parse_qs, urlparse
 from http.cookies import SimpleCookie
 import html
 import hmac
@@ -14,6 +14,72 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "cupflow.sqlite3")
 SECRET = os.environ.get("CUPFLOW_SECRET", "change-this-local-dev-secret")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
+PUBLIC_PRODUCTS = [
+    {
+        "id": "SW8",
+        "name": "Single Wall Kraft Coffee Cup",
+        "size": "8 oz",
+        "type": "Single Wall",
+        "carton": "1000 cups per box",
+        "lid": "90mm universal lid compatible",
+    },
+    {
+        "id": "SW12",
+        "name": "Single Wall Kraft Coffee Cup",
+        "size": "12 oz",
+        "type": "Single Wall",
+        "carton": "1000 cups per box",
+        "lid": "90mm universal lid compatible",
+    },
+    {
+        "id": "SW16",
+        "name": "Single Wall Kraft Coffee Cup",
+        "size": "16 oz",
+        "type": "Single Wall",
+        "carton": "1000 cups per box",
+        "lid": "90mm universal lid compatible",
+    },
+    {
+        "id": "SWLID",
+        "name": "90mm Plastic Lid",
+        "size": "90mm lids",
+        "type": "Single Wall compatible",
+        "carton": "Box quantity as currently defined",
+        "lid": "Fits 8 oz, 12 oz and 16 oz cups",
+    },
+    {
+        "id": "DW8",
+        "name": "Double Wall Kraft Coffee Cup",
+        "size": "8 oz",
+        "type": "Double Wall",
+        "carton": "500 cups per box",
+        "lid": "90mm universal lid compatible",
+    },
+    {
+        "id": "DW12",
+        "name": "Double Wall Kraft Coffee Cup",
+        "size": "12 oz",
+        "type": "Double Wall",
+        "carton": "500 cups per box",
+        "lid": "90mm universal lid compatible",
+    },
+    {
+        "id": "DW16",
+        "name": "Double Wall Kraft Coffee Cup",
+        "size": "16 oz",
+        "type": "Double Wall",
+        "carton": "500 cups per box",
+        "lid": "90mm universal lid compatible",
+    },
+    {
+        "id": "DWLID",
+        "name": "90mm Plastic Lid",
+        "size": "90mm lids",
+        "type": "Double Wall compatible",
+        "carton": "Box quantity as currently defined",
+        "lid": "Fits 8 oz, 12 oz and 16 oz cups",
+    },
+]
 
 
 def db():
@@ -214,16 +280,104 @@ def customer_options(conn):
     return "".join(f'<option value="{r["id"]}">{esc(r["business_name"])}</option>' for r in rows)
 
 
-def quote_href(product, price, product_type, size):
-    query = urlencode(
-        {
-            "product": product,
-            "price": f"{price:.2f}",
-            "type": product_type,
-            "size": size,
-        }
-    )
-    return f"/quote?{query}"
+def product_by_id():
+    return {product["id"]: product for product in PUBLIC_PRODUCTS}
+
+
+def quick_order_rows():
+    rows = ""
+    for product in PUBLIC_PRODUCTS:
+        product_id = esc(product["id"])
+        rows += f"""
+        <article class="quick-order-item" data-product-row>
+          <div>
+            <strong>{esc(product["name"])}</strong>
+            <span>{esc(product["size"])} &middot; {esc(product["type"])}</span>
+          </div>
+          <div>{esc(product["carton"])}</div>
+          <div>{esc(product["lid"])}</div>
+          <label>Boxes
+            <input type="number" min="0" step="1" inputmode="numeric" value="0" data-product-id="{product_id}">
+          </label>
+          <label>Notes
+            <input type="text" placeholder="Optional" data-product-note="{product_id}">
+          </label>
+        </article>
+        """
+    return rows
+
+
+def parse_quick_order_items(items_value):
+    products = product_by_id()
+    selected = []
+    for raw_item in (items_value or "").split("|"):
+        parts = raw_item.split(":", 2)
+        if len(parts) < 2:
+            continue
+        product = products.get(parts[0])
+        if not product:
+            continue
+        try:
+            boxes = int(parts[1])
+        except ValueError:
+            continue
+        if boxes < 1:
+            continue
+        selected.append(
+            {
+                "product": product,
+                "boxes": boxes,
+                "note": parts[2].strip() if len(parts) > 2 else "",
+            }
+        )
+    return selected
+
+
+def quick_order_summary_text(selected):
+    if not selected:
+        return ""
+    lines = []
+    for item in selected:
+        product = item["product"]
+        note = f" - Note: {item['note']}" if item["note"] else ""
+        lines.append(
+            f"{product['name']} ({product['size']}, {product['type']}) - "
+            f"{item['boxes']} boxes - {product['carton']}{note}"
+        )
+    return "\n".join(lines)
+
+
+def quick_order_table(selected):
+    if not selected:
+        return """
+        <div class="quote-empty">
+          <strong>No products selected yet.</strong>
+          <p>Please choose at least one product from Quick Order so we can prepare the right final price.</p>
+          <a class="button primary" href="/#quick-order">Choose Products</a>
+        </div>
+        """
+    rows = ""
+    for item in selected:
+        product = item["product"]
+        note = f"<small>{esc(item['note'])}</small>" if item["note"] else ""
+        rows += f"""
+        <tr>
+          <td>{esc(product["name"])}{note}</td>
+          <td>{esc(product["size"])}</td>
+          <td>{esc(product["type"])}</td>
+          <td>{esc(item["boxes"])}</td>
+        </tr>
+        """
+    return f"""
+    <div class="quick-summary-table">
+      <table>
+        <thead>
+          <tr><th>Product</th><th>Size</th><th>Type</th><th>Boxes requested</th></tr>
+        </thead>
+        <tbody>{rows}</tbody>
+      </table>
+    </div>
+    """
 
 
 class App(BaseHTTPRequestHandler):
@@ -287,15 +441,7 @@ class App(BaseHTTPRequestHandler):
         self.end_headers()
 
     def catalogue(self):
-        single_8 = quote_href("Single Wall Kraft Coffee Cup 8 oz", 49.90, "Single Wall", "8 oz")
-        single_12 = quote_href("Single Wall Kraft Coffee Cup 12 oz", 61.90, "Single Wall", "12 oz")
-        single_16 = quote_href("Single Wall Kraft Coffee Cup 16 oz", 79.90, "Single Wall", "16 oz")
-        single_lids = quote_href("Single Wall Kraft Coffee Cup Lids fit all", 39.90, "Single Wall", "Lids fit all")
-        double_8 = quote_href("Double Wall Kraft Coffee Cup 8 oz", 45.00, "Double Wall", "8 oz")
-        double_12 = quote_href("Double Wall Kraft Coffee Cup 12 oz", 50.00, "Double Wall", "12 oz")
-        double_16 = quote_href("Double Wall Kraft Coffee Cup 16 oz", 60.00, "Double Wall", "16 oz")
-        double_lids = quote_href("Double Wall Kraft Coffee Cup Lids fit all", 45.00, "Double Wall", "Lids fit all")
-        promo = quote_href("Special promotion bundle", 0.00, "Promotion", "Mixed sizes and lids")
+        quick_rows = quick_order_rows()
         body = f"""
         <section class="hero">
           <div class="hero-copy">
@@ -303,7 +449,7 @@ class App(BaseHTTPRequestHandler):
             <h1>Premium Kraft Coffee Cups with Lids</h1>
             <p>Premium quality packaging solutions for cafes, takeaway shops and coffee businesses across Australia.</p>
             <div class="hero-actions">
-              <a class="button primary" href="/quote">Request a Quote</a>
+              <a class="button primary" href="#quick-order">Start Quick Order</a>
               <a class="button ghost" href="#contact">Contact Us</a>
               <a class="button ghost" href="#products">View Products</a>
             </div>
@@ -322,9 +468,9 @@ class App(BaseHTTPRequestHandler):
         </section>
 
         <section id="products" class="section-head">
-          <p class="eyebrow">Wholesale carton pricing</p>
+          <p class="eyebrow">B2B supply catalogue</p>
           <h2>Premium Kraft Coffee Cups</h2>
-          <p>Clear carton pricing for Australian cafes, takeaway shops and coffee businesses.</p>
+          <p>Indicative pricing is available on request. Final price is confirmed after reviewing quantity, delivery area and availability.</p>
         </section>
 
         <section class="pricing-grid">
@@ -332,32 +478,86 @@ class App(BaseHTTPRequestHandler):
             <p class="sku">Single Wall Kraft Coffee Cup</p>
             <h2>1000 cups in a box</h2>
             <div class="price-list">
-              <div><span>8 oz</span><strong>$49.90</strong><a class="mini-quote" href="{single_8}">Request Quote</a></div>
-              <div><span>12 oz</span><strong>$61.90</strong><a class="mini-quote" href="{single_12}">Request Quote</a></div>
-              <div><span>16 oz</span><strong>$79.90</strong><a class="mini-quote" href="{single_16}">Request Quote</a></div>
-              <div><span>Lids fit all</span><strong>$39.90</strong><a class="mini-quote" href="{single_lids}">Request Quote</a></div>
+              <div><span>8 oz</span><strong>Bulk pricing available</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
+              <div><span>12 oz</span><strong>Best price based on quantity</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
+              <div><span>16 oz</span><strong>Request final price</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
+              <div><span>90mm lids</span><strong>Indicative pricing on request</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
             </div>
-            <a class="button primary" href="{single_8}">Request Single Wall Pricing</a>
+            <a class="button primary" href="#quick-order">Request Final Price</a>
           </article>
 
           <article class="product-card featured">
             <p class="sku">Double Wall Kraft Coffee Cup</p>
             <h2>500 cups in a box</h2>
             <div class="price-list">
-              <div><span>8 oz</span><strong>$45.00</strong><a class="mini-quote" href="{double_8}">Request Quote</a></div>
-              <div><span>12 oz</span><strong>$50.00</strong><a class="mini-quote" href="{double_12}">Request Quote</a></div>
-              <div><span>16 oz</span><strong>$60.00</strong><a class="mini-quote" href="{double_16}">Request Quote</a></div>
-              <div><span>Lids fit all</span><strong>$45.00</strong><a class="mini-quote" href="{double_lids}">Request Quote</a></div>
+              <div><span>8 oz</span><strong>Bulk pricing available</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
+              <div><span>12 oz</span><strong>Best price based on quantity</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
+              <div><span>16 oz</span><strong>Request final price</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
+              <div><span>90mm lids</span><strong>Indicative pricing on request</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
             </div>
-            <a class="button primary" href="{double_8}">Request Double Wall Pricing</a>
+            <a class="button primary" href="#quick-order">Request Final Price</a>
           </article>
 
           <article class="promo-card">
-            <p class="eyebrow">Special promotion</p>
-            <h2>Buy one box of each size coffee cups plus two boxes of lids, get 250 lids for free.</h2>
-            <p>Be quick, limited time only.</p>
-            <a class="button ghost" href="{promo}">Claim Promotion</a>
+            <p class="eyebrow">B2B final pricing</p>
+            <h2>Build one quick order enquiry and we will confirm the best final price manually.</h2>
+            <p>Final pricing depends on quantity, delivery area, customer type and current availability.</p>
+            <a class="button ghost" href="#quick-order">Start Quick Order</a>
           </article>
+        </section>
+
+        <section id="quick-order" class="quick-order-section">
+          <div class="section-head">
+            <p class="eyebrow">Quick Order</p>
+            <h2>Select Products Once</h2>
+            <p>Enter the number of boxes you need, then submit one enquiry for manual final pricing.</p>
+          </div>
+          <form class="quick-order-form" action="/quote" method="get">
+            <input type="hidden" name="items" id="quick_order_items">
+            <div class="quick-order-head">
+              <span>Product</span>
+              <span>Carton quantity</span>
+              <span>Lid compatibility</span>
+              <span>Quantity</span>
+              <span>Notes</span>
+            </div>
+            <div class="quick-order-list">
+              {quick_rows}
+            </div>
+            <p class="quick-warning" id="quick_order_warning" role="alert">Please enter at least one box quantity before requesting a final price.</p>
+            <div class="quick-order-actions">
+              <span>Bulk pricing available. No payment or checkout.</span>
+              <button class="button primary" type="submit">Request Final Price</button>
+            </div>
+          </form>
+          <script>
+            const quickOrderForm = document.querySelector(".quick-order-form");
+            const quickOrderItems = document.getElementById("quick_order_items");
+            const quickOrderWarning = document.getElementById("quick_order_warning");
+
+            quickOrderForm.addEventListener("submit", (event) => {{
+              const selected = [];
+              document.querySelectorAll("[data-product-id]").forEach((input) => {{
+                const boxes = Number.parseInt(input.value || "0", 10);
+                if (boxes > 0) {{
+                  const id = input.dataset.productId;
+                  const noteInput = document.querySelector(`[data-product-note="${{id}}"]`);
+                  const note = noteInput ? noteInput.value.trim().replace(/[|:]/g, " ") : "";
+                  selected.push(`${{id}}:${{boxes}}:${{note}}`);
+                }}
+              }});
+
+              if (!selected.length) {{
+                event.preventDefault();
+                quickOrderWarning.classList.add("show");
+                quickOrderWarning.scrollIntoView({{ behavior: "smooth", block: "center" }});
+                return;
+              }}
+
+              quickOrderWarning.classList.remove("show");
+              quickOrderItems.value = selected.join("|");
+            }});
+          </script>
         </section>
 
         <section class="spec-section">
@@ -416,6 +616,17 @@ class App(BaseHTTPRequestHandler):
     def quote(self):
         if self.command == "POST":
             f = self.form()
+            order_summary = f.get("order_summary") or f.get("product_interest") or ""
+            delivery = f.get("delivery_suburb") or ""
+            customer_message = f.get("message") or ""
+            message_parts = []
+            if order_summary:
+                message_parts.append(f"Selected products:\n{order_summary}")
+            if delivery:
+                message_parts.append(f"Delivery suburb/postcode: {delivery}")
+            if customer_message:
+                message_parts.append(f"Customer message:\n{customer_message}")
+            saved_message = "\n\n".join(message_parts) if message_parts else customer_message
             with db() as conn:
                 conn.execute(
                     """
@@ -428,9 +639,9 @@ class App(BaseHTTPRequestHandler):
                         f.get("contact_name"),
                         f.get("email"),
                         f.get("phone"),
-                        f.get("product_interest"),
+                        order_summary,
                         f.get("monthly_volume"),
-                        f.get("message"),
+                        saved_message,
                     ),
                 )
             body = """
@@ -442,89 +653,34 @@ class App(BaseHTTPRequestHandler):
             """
             return self.respond(layout("Quote Sent", body, self.is_authed()))
         query = parse_qs(urlparse(self.path).query)
-        product = query.get("product", [""])[0].strip()
-        product_type = query.get("type", [""])[0].strip()
-        size = query.get("size", [""])[0].strip()
-        raw_price = query.get("price", [""])[0].strip()
-        try:
-            price = float(raw_price) if raw_price else 0
-        except ValueError:
-            price = 0
-            raw_price = ""
-        price_display = f"{price:.2f}" if raw_price else ""
-        product_interest = "; ".join(
-            part
-            for part in [
-                f"Product: {product}" if product else "",
-                f"Type: {product_type}" if product_type else "",
-                f"Size: {size}" if size else "",
-                f"Price: ${price_display} per box" if price_display else "",
-            ]
-            if part
-        )
+        selected = parse_quick_order_items(query.get("items", [""])[0])
+        summary_text = quick_order_summary_text(selected)
+        summary_table = quick_order_table(selected)
+        total_boxes = sum(item["boxes"] for item in selected)
+        disabled = "" if selected else "disabled"
         body = f"""
         <section class="panel narrow quote-panel">
           <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
-          <h1>Request a Quote</h1>
+          <h1>Quick Order Enquiry</h1>
+          <div class="quote-summary">
+            <h2>Selected products</h2>
+            {summary_table}
+            <p class="final-price-note">Final price will be confirmed based on quantity, delivery area and availability.</p>
+          </div>
           <form method="post" class="form quote-form">
-            <input id="product_interest" type="hidden" name="product_interest" value="{esc(product_interest)}">
-            <div class="quote-summary" data-price="{esc(price_display or '0')}">
-              <h2>Selected product</h2>
-              <label>Product name<input id="quote_product" name="product_name" value="{esc(product)}" placeholder="Select a product from the catalogue"></label>
-              <div class="quote-detail-grid">
-                <label>Product type<input id="quote_type" name="product_type" value="{esc(product_type)}" placeholder="Single Wall, Double Wall or Lid"></label>
-                <label>Size<input id="quote_size" name="product_size" value="{esc(size)}" placeholder="8 oz, 12 oz, 16 oz or lids"></label>
-                <label>Price per box<input id="quote_price" name="price" value="{esc(price_display)}" placeholder="0.00"></label>
-                <label>Number of boxes<input id="box_quantity" name="monthly_volume" type="number" min="1" step="1" value="1"></label>
-              </div>
-              <div class="estimate-row">
-                <span>Estimated total</span>
-                <strong id="estimated_total">{money(price)}</strong>
-              </div>
+            <textarea hidden name="product_interest">{esc(summary_text)}</textarea>
+            <textarea hidden name="order_summary">{esc(summary_text)}</textarea>
+            <input type="hidden" name="monthly_volume" value="{esc(f'{total_boxes} boxes requested' if total_boxes else '')}">
+            <div class="quote-detail-grid">
+              <label>Business name<input name="business_name" required {disabled}></label>
+              <label>Contact person<input name="contact_name" required {disabled}></label>
+              <label>Phone<input name="phone" required {disabled}></label>
+              <label>Email<input name="email" type="email" required {disabled}></label>
+              <label>Delivery suburb / postcode<input name="delivery_suburb" required {disabled}></label>
             </div>
-            <label>Business name<input name="business_name" required></label>
-            <label>Contact name<input name="contact_name"></label>
-            <label>Email<input name="email" type="email" required></label>
-            <label>Phone<input name="phone"></label>
-            <label>Message<textarea name="message" rows="4" placeholder="Delivery suburb, preferred timing, or any special requirements"></textarea></label>
-            <button class="button primary" type="submit">Send request</button>
+            <label>Message / special request<textarea name="message" rows="4" placeholder="Delivery timing, invoice details, or any special requirements" {disabled}></textarea></label>
+            <button class="button primary" type="submit" {disabled}>Submit Quick Order Enquiry</button>
           </form>
-          <script>
-            const quoteSummary = document.querySelector(".quote-summary");
-            const quantityInput = document.getElementById("box_quantity");
-            const totalOutput = document.getElementById("estimated_total");
-            const productInput = document.getElementById("quote_product");
-            const typeInput = document.getElementById("quote_type");
-            const sizeInput = document.getElementById("quote_size");
-            const priceInput = document.getElementById("quote_price");
-            const interestInput = document.getElementById("product_interest");
-
-            function parsePrice() {{
-              return Number.parseFloat(priceInput.value || quoteSummary.dataset.price || "0") || 0;
-            }}
-
-            function updateQuoteEstimate() {{
-              const boxes = Math.max(1, Number.parseInt(quantityInput.value || "1", 10));
-              const price = parsePrice();
-              quantityInput.value = boxes;
-              totalOutput.textContent = new Intl.NumberFormat("en-AU", {{
-                style: "currency",
-                currency: "AUD"
-              }}).format(price * boxes);
-              interestInput.value = [
-                productInput.value ? `Product: ${{productInput.value}}` : "",
-                typeInput.value ? `Type: ${{typeInput.value}}` : "",
-                sizeInput.value ? `Size: ${{sizeInput.value}}` : "",
-                price ? `Price: $${{price.toFixed(2)}} per box` : "",
-                `Boxes: ${{boxes}}`
-              ].filter(Boolean).join("; ");
-            }}
-
-            [quantityInput, productInput, typeInput, sizeInput, priceInput].forEach((input) => {{
-              input.addEventListener("input", updateQuoteEstimate);
-            }});
-            updateQuoteEstimate();
-          </script>
         </section>
         """
         self.respond(layout("Request Quote", body, self.is_authed()))

@@ -495,6 +495,13 @@ button.primary:hover {
   background: var(--gold-soft);
 }
 
+button:disabled,
+input:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
 .button.ghost {
   border-color: var(--line);
   color: var(--gold-soft);
@@ -505,6 +512,104 @@ button.primary:hover {
   color: var(--green-950);
   border-color: rgba(3, 22, 17, 0.22);
   background: rgba(255, 255, 255, 0.36);
+}
+
+.quick-order-section {
+  margin-top: 34px;
+  padding: clamp(22px, 4vw, 38px);
+  color: var(--white);
+  background: linear-gradient(135deg, var(--green-900), var(--green-950));
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+.quick-order-section .section-head {
+  margin-top: 0;
+}
+
+.quick-order-section .section-head h2 {
+  color: var(--white);
+}
+
+.quick-order-section .section-head p {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.quick-order-form {
+  display: grid;
+  gap: 12px;
+}
+
+.quick-order-head,
+.quick-order-item {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) minmax(140px, 0.9fr) minmax(160px, 1fr) minmax(96px, 0.55fr) minmax(150px, 0.8fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.quick-order-head {
+  padding: 0 16px 6px;
+  color: var(--gold-soft);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quick-order-list {
+  display: grid;
+  gap: 10px;
+}
+
+.quick-order-item {
+  padding: 16px;
+  border: 1px solid rgba(216, 168, 77, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.quick-order-item strong {
+  display: block;
+  color: var(--white);
+}
+
+.quick-order-item span,
+.quick-order-item div {
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.quick-order-item label {
+  color: var(--gold-soft);
+}
+
+.quick-order-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.quick-order-actions span {
+  color: rgba(255, 255, 255, 0.74);
+  font-weight: 800;
+}
+
+.quick-warning {
+  display: none;
+  margin: 0;
+  padding: 12px 14px;
+  color: #fff7df;
+  background: rgba(159, 45, 33, 0.42);
+  border: 1px solid rgba(255, 210, 201, 0.46);
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.quick-warning.show {
+  display: block;
 }
 
 .mini-quote {
@@ -556,8 +661,60 @@ button.primary:hover {
   font-family: Georgia, "Times New Roman", serif;
 }
 
-.quote-summary label {
+.quick-summary-table {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.quick-summary-table table {
+  min-width: 620px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.quick-summary-table th {
+  color: var(--gold-soft);
+  background: rgba(3, 22, 17, 0.58);
+}
+
+.quick-summary-table td {
+  color: rgba(255, 255, 255, 0.84);
+  border-color: rgba(216, 168, 77, 0.24);
+}
+
+.quick-summary-table small {
+  display: block;
+  margin-top: 4px;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.quote-empty {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid rgba(255, 210, 201, 0.46);
+  border-radius: 8px;
+  background: rgba(159, 45, 33, 0.28);
+}
+
+.quote-empty strong {
+  color: var(--gold-soft);
+  font-size: 20px;
+}
+
+.quote-empty p,
+.final-price-note {
+  margin: 0;
   color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+}
+
+.final-price-note {
+  padding: 14px 16px;
+  border-left: 3px solid var(--gold);
+  background: rgba(216, 168, 77, 0.1);
+  font-weight: 800;
 }
 
 .quote-detail-grid {
@@ -729,6 +886,20 @@ footer {
   .hero-badge {
     display: none;
   }
+
+  .quick-order-head {
+    display: none;
+  }
+
+  .quick-order-item {
+    grid-template-columns: 1fr 1fr;
+    align-items: start;
+  }
+
+  .quick-order-item > div:first-child,
+  .quick-order-item > div:nth-child(3) {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 640px) {
@@ -795,5 +966,22 @@ footer {
   .estimate-row {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .quick-order-section {
+    padding: 18px;
+  }
+
+  .quick-order-item {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-order-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .quick-summary-table table {
+    min-width: 540px;
   }
 }
