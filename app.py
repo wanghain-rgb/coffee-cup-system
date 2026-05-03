@@ -726,15 +726,14 @@ class App(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
 
-
 def main():
     init_db()
     port = int(os.environ.get("PORT", "8000"))
-    server = ThreadingHTTPServer(("127.0.0.1", port), App)
-    print(f"{APP_NAME} running at http://127.0.0.1:{port}")
+    host = "0.0.0.0"
+    server = ThreadingHTTPServer((host, port), App)
+    print(f"{APP_NAME} running at http://{host}:{port}")
     print("Admin login: admin / admin123")
     server.serve_forever()
-
 
 if __name__ == "__main__":
     main()
