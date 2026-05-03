@@ -1,5 +1,5 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlencode, urlparse
 from http.cookies import SimpleCookie
 import html
 import hmac
@@ -214,6 +214,18 @@ def customer_options(conn):
     return "".join(f'<option value="{r["id"]}">{esc(r["business_name"])}</option>' for r in rows)
 
 
+def quote_href(product, price, product_type, size):
+    query = urlencode(
+        {
+            "product": product,
+            "price": f"{price:.2f}",
+            "type": product_type,
+            "size": size,
+        }
+    )
+    return f"/quote?{query}"
+
+
 class App(BaseHTTPRequestHandler):
     def do_GET(self):
         self.route()
@@ -275,7 +287,16 @@ class App(BaseHTTPRequestHandler):
         self.end_headers()
 
     def catalogue(self):
-        body = """
+        single_8 = quote_href("Single Wall Kraft Coffee Cup 8 oz", 49.90, "Single Wall", "8 oz")
+        single_12 = quote_href("Single Wall Kraft Coffee Cup 12 oz", 61.90, "Single Wall", "12 oz")
+        single_16 = quote_href("Single Wall Kraft Coffee Cup 16 oz", 79.90, "Single Wall", "16 oz")
+        single_lids = quote_href("Single Wall Kraft Coffee Cup Lids fit all", 39.90, "Single Wall", "Lids fit all")
+        double_8 = quote_href("Double Wall Kraft Coffee Cup 8 oz", 45.00, "Double Wall", "8 oz")
+        double_12 = quote_href("Double Wall Kraft Coffee Cup 12 oz", 50.00, "Double Wall", "12 oz")
+        double_16 = quote_href("Double Wall Kraft Coffee Cup 16 oz", 60.00, "Double Wall", "16 oz")
+        double_lids = quote_href("Double Wall Kraft Coffee Cup Lids fit all", 45.00, "Double Wall", "Lids fit all")
+        promo = quote_href("Special promotion bundle", 0.00, "Promotion", "Mixed sizes and lids")
+        body = f"""
         <section class="hero">
           <div class="hero-copy">
             <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
@@ -311,31 +332,31 @@ class App(BaseHTTPRequestHandler):
             <p class="sku">Single Wall Kraft Coffee Cup</p>
             <h2>1000 cups in a box</h2>
             <div class="price-list">
-              <div><span>8 oz</span><strong>$49.90</strong></div>
-              <div><span>12 oz</span><strong>$61.90</strong></div>
-              <div><span>16 oz</span><strong>$79.90</strong></div>
-              <div><span>Lids fit all</span><strong>$39.90</strong></div>
+              <div><span>8 oz</span><strong>$49.90</strong><a class="mini-quote" href="{single_8}">Request Quote</a></div>
+              <div><span>12 oz</span><strong>$61.90</strong><a class="mini-quote" href="{single_12}">Request Quote</a></div>
+              <div><span>16 oz</span><strong>$79.90</strong><a class="mini-quote" href="{single_16}">Request Quote</a></div>
+              <div><span>Lids fit all</span><strong>$39.90</strong><a class="mini-quote" href="{single_lids}">Request Quote</a></div>
             </div>
-            <a class="button primary" href="/quote">Request Single Wall Pricing</a>
+            <a class="button primary" href="{single_8}">Request Single Wall Pricing</a>
           </article>
 
           <article class="product-card featured">
             <p class="sku">Double Wall Kraft Coffee Cup</p>
             <h2>500 cups in a box</h2>
             <div class="price-list">
-              <div><span>8 oz</span><strong>$45.00</strong></div>
-              <div><span>12 oz</span><strong>$50.00</strong></div>
-              <div><span>16 oz</span><strong>$60.00</strong></div>
-              <div><span>Lids fit all</span><strong>$45.00</strong></div>
+              <div><span>8 oz</span><strong>$45.00</strong><a class="mini-quote" href="{double_8}">Request Quote</a></div>
+              <div><span>12 oz</span><strong>$50.00</strong><a class="mini-quote" href="{double_12}">Request Quote</a></div>
+              <div><span>16 oz</span><strong>$60.00</strong><a class="mini-quote" href="{double_16}">Request Quote</a></div>
+              <div><span>Lids fit all</span><strong>$45.00</strong><a class="mini-quote" href="{double_lids}">Request Quote</a></div>
             </div>
-            <a class="button primary" href="/quote">Request Double Wall Pricing</a>
+            <a class="button primary" href="{double_8}">Request Double Wall Pricing</a>
           </article>
 
           <article class="promo-card">
             <p class="eyebrow">Special promotion</p>
             <h2>Buy one box of each size coffee cups plus two boxes of lids, get 250 lids for free.</h2>
             <p>Be quick, limited time only.</p>
-            <a class="button ghost" href="/quote">Claim Promotion</a>
+            <a class="button ghost" href="{promo}">Claim Promotion</a>
           </article>
         </section>
 
@@ -420,19 +441,90 @@ class App(BaseHTTPRequestHandler):
             </section>
             """
             return self.respond(layout("Quote Sent", body, self.is_authed()))
-        body = """
-        <section class="panel narrow">
+        query = parse_qs(urlparse(self.path).query)
+        product = query.get("product", [""])[0].strip()
+        product_type = query.get("type", [""])[0].strip()
+        size = query.get("size", [""])[0].strip()
+        raw_price = query.get("price", [""])[0].strip()
+        try:
+            price = float(raw_price) if raw_price else 0
+        except ValueError:
+            price = 0
+            raw_price = ""
+        price_display = f"{price:.2f}" if raw_price else ""
+        product_interest = "; ".join(
+            part
+            for part in [
+                f"Product: {product}" if product else "",
+                f"Type: {product_type}" if product_type else "",
+                f"Size: {size}" if size else "",
+                f"Price: ${price_display} per box" if price_display else "",
+            ]
+            if part
+        )
+        body = f"""
+        <section class="panel narrow quote-panel">
+          <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
           <h1>Request a Quote</h1>
-          <form method="post" class="form">
+          <form method="post" class="form quote-form">
+            <input id="product_interest" type="hidden" name="product_interest" value="{esc(product_interest)}">
+            <div class="quote-summary" data-price="{esc(price_display or '0')}">
+              <h2>Selected product</h2>
+              <label>Product name<input id="quote_product" name="product_name" value="{esc(product)}" placeholder="Select a product from the catalogue"></label>
+              <div class="quote-detail-grid">
+                <label>Product type<input id="quote_type" name="product_type" value="{esc(product_type)}" placeholder="Single Wall, Double Wall or Lid"></label>
+                <label>Size<input id="quote_size" name="product_size" value="{esc(size)}" placeholder="8 oz, 12 oz, 16 oz or lids"></label>
+                <label>Price per box<input id="quote_price" name="price" value="{esc(price_display)}" placeholder="0.00"></label>
+                <label>Number of boxes<input id="box_quantity" name="monthly_volume" type="number" min="1" step="1" value="1"></label>
+              </div>
+              <div class="estimate-row">
+                <span>Estimated total</span>
+                <strong id="estimated_total">{money(price)}</strong>
+              </div>
+            </div>
             <label>Business name<input name="business_name" required></label>
             <label>Contact name<input name="contact_name"></label>
             <label>Email<input name="email" type="email" required></label>
             <label>Phone<input name="phone"></label>
-            <label>Product interest<input name="product_interest" placeholder="8oz cups, 12oz cups, lids"></label>
-            <label>Monthly volume<input name="monthly_volume" placeholder="e.g. 10 cartons per month"></label>
-            <label>Message<textarea name="message" rows="4"></textarea></label>
+            <label>Message<textarea name="message" rows="4" placeholder="Delivery suburb, preferred timing, or any special requirements"></textarea></label>
             <button class="button primary" type="submit">Send request</button>
           </form>
+          <script>
+            const quoteSummary = document.querySelector(".quote-summary");
+            const quantityInput = document.getElementById("box_quantity");
+            const totalOutput = document.getElementById("estimated_total");
+            const productInput = document.getElementById("quote_product");
+            const typeInput = document.getElementById("quote_type");
+            const sizeInput = document.getElementById("quote_size");
+            const priceInput = document.getElementById("quote_price");
+            const interestInput = document.getElementById("product_interest");
+
+            function parsePrice() {{
+              return Number.parseFloat(priceInput.value || quoteSummary.dataset.price || "0") || 0;
+            }}
+
+            function updateQuoteEstimate() {{
+              const boxes = Math.max(1, Number.parseInt(quantityInput.value || "1", 10));
+              const price = parsePrice();
+              quantityInput.value = boxes;
+              totalOutput.textContent = new Intl.NumberFormat("en-AU", {{
+                style: "currency",
+                currency: "AUD"
+              }}).format(price * boxes);
+              interestInput.value = [
+                productInput.value ? `Product: ${{productInput.value}}` : "",
+                typeInput.value ? `Type: ${{typeInput.value}}` : "",
+                sizeInput.value ? `Size: ${{sizeInput.value}}` : "",
+                price ? `Price: $${{price.toFixed(2)}} per box` : "",
+                `Boxes: ${{boxes}}`
+              ].filter(Boolean).join("; ");
+            }}
+
+            [quantityInput, productInput, typeInput, sizeInput, priceInput].forEach((input) => {{
+              input.addEventListener("input", updateQuoteEstimate);
+            }});
+            updateQuoteEstimate();
+          </script>
         </section>
         """
         self.respond(layout("Request Quote", body, self.is_authed()))
