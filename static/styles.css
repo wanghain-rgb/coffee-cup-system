@@ -930,6 +930,15 @@ textarea:disabled {
   color: var(--ink);
 }
 
+.email-status {
+  padding: 12px 14px;
+  color: var(--green-950);
+  background: #fff4d9;
+  border: 1px solid rgba(216, 168, 77, 0.46);
+  border-radius: 6px;
+  font-weight: 900;
+}
+
 .quotation-next {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
