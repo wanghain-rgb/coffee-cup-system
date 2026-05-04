@@ -122,21 +122,19 @@ nav a:hover {
 main {
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 28px 0 54px;
+  padding: 24px 0 60px;
 }
 
 .hero {
-  min-height: 560px;
+  min-height: 430px;
   position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 28px;
   overflow: hidden;
-  padding: clamp(30px, 6vw, 74px);
+  padding: clamp(32px, 7vw, 82px);
   color: var(--white);
   background:
-    linear-gradient(90deg, rgba(3, 22, 17, 0.95) 0%, rgba(3, 22, 17, 0.74) 42%, rgba(3, 22, 17, 0.24) 100%),
+    linear-gradient(90deg, rgba(3, 22, 17, 0.96) 0%, rgba(3, 22, 17, 0.76) 48%, rgba(3, 22, 17, 0.2) 100%),
     url("/static/hero-cups.png");
   background-size: cover;
   background-position: center right;
@@ -156,15 +154,15 @@ main {
 .hero-copy {
   position: relative;
   z-index: 1;
-  max-width: 690px;
+  max-width: 760px;
 }
 
 .hero h1 {
   max-width: 720px;
   margin: 0 0 18px;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(40px, 6vw, 76px);
-  line-height: 1.02;
+  font-size: clamp(42px, 6vw, 74px);
+  line-height: 1.03;
   letter-spacing: 0;
 }
 
@@ -180,6 +178,12 @@ main {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
+}
+
+.hero-actions .button {
+  min-height: 50px;
+  padding-inline: 22px;
+  font-size: 16px;
 }
 
 .hero-badge {
@@ -515,8 +519,8 @@ textarea:disabled {
 }
 
 .quick-order-section {
-  margin-top: 34px;
-  padding: clamp(22px, 4vw, 38px);
+  margin-top: 26px;
+  padding: clamp(24px, 4vw, 44px);
   color: var(--white);
   background: linear-gradient(135deg, var(--green-900), var(--green-950));
   border: 1px solid var(--line);
@@ -526,10 +530,12 @@ textarea:disabled {
 
 .quick-order-section .section-head {
   margin-top: 0;
+  margin-bottom: 24px;
 }
 
 .quick-order-section .section-head h2 {
   color: var(--white);
+  font-size: clamp(34px, 5vw, 52px);
 }
 
 .quick-order-section .section-head p {
@@ -560,11 +566,11 @@ textarea:disabled {
 
 .quick-order-list {
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .quick-order-item {
-  padding: 16px;
+  padding: 18px;
   border: 1px solid rgba(216, 168, 77, 0.28);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
@@ -589,7 +595,7 @@ textarea:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-top: 8px;
+  padding-top: 14px;
 }
 
 .quick-order-actions span {
@@ -610,6 +616,91 @@ textarea:disabled {
 
 .quick-warning.show {
   display: block;
+}
+
+.why-section {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin: 42px 0 36px;
+}
+
+.why-section article {
+  display: grid;
+  gap: 10px;
+  min-height: 138px;
+  padding: 22px;
+  color: var(--white);
+  background: var(--green-900);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.why-section strong {
+  color: var(--gold-soft);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 23px;
+}
+
+.why-section span {
+  color: rgba(255, 255, 255, 0.76);
+  line-height: 1.5;
+}
+
+.product-heading {
+  margin-top: 10px;
+}
+
+.product-showcase {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.product-showcase article {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(8, 47, 37, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 14px 36px rgba(7, 31, 24, 0.09);
+}
+
+.product-image {
+  min-height: 190px;
+  background:
+    linear-gradient(180deg, rgba(3, 22, 17, 0), rgba(3, 22, 17, 0.18)),
+    url("/static/hero-cups.png");
+  background-size: cover;
+  background-position: center;
+}
+
+.product-showcase article:nth-child(2) .product-image {
+  background-position: 58% center;
+}
+
+.product-showcase article:nth-child(3) .product-image {
+  background-position: 78% center;
+}
+
+.product-showcase h3,
+.product-showcase p {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+.product-showcase h3 {
+  margin-top: 20px;
+  margin-bottom: 8px;
+  color: var(--green-950);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 24px;
+}
+
+.product-showcase p {
+  margin-top: 0;
+  margin-bottom: 22px;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .mini-quote {
@@ -1037,7 +1128,9 @@ footer {
 @media (max-width: 900px) {
   .pricing-grid,
   .benefits,
-  .contact-section {
+  .contact-section,
+  .why-section,
+  .product-showcase {
     grid-template-columns: 1fr 1fr;
   }
 
@@ -1047,7 +1140,7 @@ footer {
   }
 
   .hero {
-    min-height: 520px;
+    min-height: 420px;
     align-items: flex-end;
   }
 
@@ -1086,13 +1179,13 @@ footer {
   }
 
   .hero {
-    min-height: 560px;
+    min-height: 440px;
     padding: 24px;
     background-position: 62% center;
   }
 
   .hero h1 {
-    font-size: 40px;
+    font-size: 39px;
   }
 
   .hero-actions,
@@ -1103,7 +1196,9 @@ footer {
 
   .benefits,
   .pricing-grid,
-  .contact-section {
+  .contact-section,
+  .why-section,
+  .product-showcase {
     grid-template-columns: 1fr;
   }
 

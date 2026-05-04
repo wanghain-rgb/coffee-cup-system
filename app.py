@@ -563,71 +563,19 @@ class App(BaseHTTPRequestHandler):
         <section class="hero">
           <div class="hero-copy">
             <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
-            <h1>Premium Kraft Coffee Cups with Lids</h1>
-            <p>Premium quality packaging solutions for cafes, takeaway shops and coffee businesses across Australia.</p>
+            <h1>Premium Coffee Cups &amp; Packaging for Cafes</h1>
+            <p>Fast delivery across Melbourne. Best pricing based on quantity.</p>
             <div class="hero-actions">
-              <a class="button primary" href="#quick-order">Start Quick Order</a>
-              <a class="button ghost" href="#contact">Contact Us</a>
-              <a class="button ghost" href="#products">View Products</a>
+              <a class="button primary" href="#quick-order">Get Best Price Now</a>
             </div>
           </div>
-          <aside class="hero-badge">
-            <span>Premium Insulation</span>
-            Keeps drinks hot longer
-          </aside>
-        </section>
-
-        <section class="benefits" aria-label="Key benefits">
-          <article><strong>Sustainable</strong><span>Eco-friendly materials</span></article>
-          <article><strong>Strong &amp; Reliable</strong><span>Durable and leak-proof design</span></article>
-          <article><strong>Perfect Fit</strong><span>90mm universal lid compatible</span></article>
-          <article><strong>Premium Insulation</strong><span>Keeps drinks hot longer</span></article>
-        </section>
-
-        <section id="products" class="section-head">
-          <p class="eyebrow">B2B supply catalogue</p>
-          <h2>Premium Kraft Coffee Cups</h2>
-          <p>Indicative pricing is available on request. Final price is confirmed after reviewing quantity, delivery area and availability.</p>
-        </section>
-
-        <section class="pricing-grid">
-          <article class="product-card featured">
-            <p class="sku">Single Wall Kraft Coffee Cup</p>
-            <h2>1000 cups in a box</h2>
-            <div class="price-list">
-              <div><span>8 oz</span><strong>Bulk pricing available</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
-              <div><span>12 oz</span><strong>Best price based on quantity</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
-              <div><span>16 oz</span><strong>Request final price</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
-              <div><span>90mm lids</span><strong>Indicative pricing on request</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
-            </div>
-            <a class="button primary" href="#quick-order">Request Final Price</a>
-          </article>
-
-          <article class="product-card featured">
-            <p class="sku">Double Wall Kraft Coffee Cup</p>
-            <h2>500 cups in a box</h2>
-            <div class="price-list">
-              <div><span>8 oz</span><strong>Bulk pricing available</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
-              <div><span>12 oz</span><strong>Best price based on quantity</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
-              <div><span>16 oz</span><strong>Request final price</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
-              <div><span>90mm lids</span><strong>Indicative pricing on request</strong><a class="mini-quote" href="#quick-order">Add to Quick Order</a></div>
-            </div>
-            <a class="button primary" href="#quick-order">Request Final Price</a>
-          </article>
-
-          <article class="promo-card">
-            <p class="eyebrow">B2B final pricing</p>
-            <h2>Build one quick order enquiry and we will confirm the best final price manually.</h2>
-            <p>Final pricing depends on quantity, delivery area, customer type and current availability.</p>
-            <a class="button ghost" href="#quick-order">Start Quick Order</a>
-          </article>
         </section>
 
         <section id="quick-order" class="quick-order-section">
           <div class="section-head">
             <p class="eyebrow">Quick Order</p>
-            <h2>Select Products Once</h2>
-            <p>Enter the number of boxes you need, then submit one enquiry for manual final pricing.</p>
+            <h2>Request Best Price</h2>
+            <p>Select products, enter box quantities, and submit one enquiry. We confirm your best price manually.</p>
           </div>
           <form class="quick-order-form" action="/quote" method="get">
             <input type="hidden" name="items" id="quick_order_items">
@@ -644,7 +592,7 @@ class App(BaseHTTPRequestHandler):
             <p class="quick-warning" id="quick_order_warning" role="alert">Please enter at least one box quantity before requesting a final price.</p>
             <div class="quick-order-actions">
               <span>Bulk pricing available. No payment or checkout.</span>
-              <button class="button primary" type="submit">Request Final Price</button>
+              <button class="button primary" type="submit">Request Best Price</button>
             </div>
           </form>
           <script>
@@ -677,53 +625,46 @@ class App(BaseHTTPRequestHandler):
           </script>
         </section>
 
-        <section class="spec-section">
-          <div class="section-head">
-            <p class="eyebrow">Product specifications</p>
-            <h2>Designed for a 90mm Universal Lid</h2>
-          </div>
+        <section class="why-section">
+          <article><strong>Fast Delivery</strong><span>Melbourne supply for cafes and takeaway businesses.</span></article>
+          <article><strong>Reliable Quality</strong><span>Durable kraft cups and compatible lids.</span></article>
+          <article><strong>Bulk Pricing</strong><span>Best pricing based on order quantity.</span></article>
+          <article><strong>Local Supplier</strong><span>Speak directly with a Melbourne packaging supplier.</span></article>
+        </section>
 
-          <div class="spec-grid">
-            <article class="spec-card">
-              <h3>Single Wall Kraft Coffee Cup</h3>
-              <dl>
-                <div><dt>8 oz</dt><dd>90mm top &middot; 85.5mm height &middot; 56.5mm bottom</dd></div>
-                <div><dt>12 oz</dt><dd>90mm top &middot; 116mm height &middot; 58mm bottom</dd></div>
-                <div><dt>16 oz</dt><dd>90mm top &middot; 136mm height &middot; 58mm bottom</dd></div>
-              </dl>
-            </article>
+        <section id="products" class="section-head product-heading">
+          <p class="eyebrow">Products</p>
+          <h2>Cafe Packaging Essentials</h2>
+        </section>
 
-            <article class="spec-card">
-              <h3>Double Wall Kraft Coffee Cup</h3>
-              <dl>
-                <div><dt>8 oz</dt><dd>90mm top &middot; 85.5mm height &middot; 56.5mm bottom</dd></div>
-                <div><dt>12 oz</dt><dd>90mm top &middot; 116mm height &middot; 58mm bottom</dd></div>
-                <div><dt>16 oz</dt><dd>90mm top &middot; 136mm height &middot; 58mm bottom</dd></div>
-              </dl>
-            </article>
-
-            <article class="spec-card lid-card">
-              <h3>Lid</h3>
-              <dl>
-                <div><dt>Type</dt><dd>90mm plastic lid</dd></div>
-                <div><dt>Height</dt><dd>23mm</dd></div>
-                <div><dt>Fit</dt><dd>90mm universal lid</dd></div>
-              </dl>
-            </article>
-          </div>
+        <section class="product-showcase">
+          <article>
+            <div class="product-image"></div>
+            <h3>Single Wall Kraft Coffee Cups</h3>
+            <p>Lightweight everyday cups for takeaway coffee service.</p>
+          </article>
+          <article>
+            <div class="product-image"></div>
+            <h3>Double Wall Kraft Coffee Cups</h3>
+            <p>Extra insulation and a comfortable hold for hot drinks.</p>
+          </article>
+          <article>
+            <div class="product-image"></div>
+            <h3>90mm Lids</h3>
+            <p>Universal lids compatible with core 8 oz, 12 oz and 16 oz sizes.</p>
+          </article>
         </section>
 
         <section id="contact" class="contact-section">
           <div>
-            <p class="eyebrow">Your trusted partner</p>
-            <h2>Premium packaging supply across Australia</h2>
-            <p>Speak with Stone Wang for product availability, bulk carton pricing and cafe supply requirements.</p>
+            <p class="eyebrow">Contact</p>
+            <h2>Talk to AUREA</h2>
+            <p>Send a quick order enquiry or contact us for cafe packaging supply in Melbourne.</p>
           </div>
           <div class="contact-card">
             <strong>Stone Wang</strong>
-            <a href="tel:0497278099">0497278099</a>
-            <a href="mailto:info@aureapackaging.com.au">info@aureapackaging.com.au</a>
-            <a href="https://www.aureapackaging.com.au">www.aureapackaging.com.au</a>
+            <a href="tel:0412345678">0412 345 678</a>
+            <a href="mailto:stone.wang@aureapackaging.com.au">stone.wang@aureapackaging.com.au</a>
             <span>Melbourne, Australia</span>
           </div>
         </section>
