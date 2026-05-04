@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from http.cookies import SimpleCookie
+from datetime import date
 import html
 import hmac
 import mimetypes
@@ -22,6 +23,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "quote_price": 49.90,
     },
     {
         "id": "SW12",
@@ -30,6 +32,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "quote_price": 61.90,
     },
     {
         "id": "SW16",
@@ -38,6 +41,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "quote_price": 79.90,
     },
     {
         "id": "SWLID",
@@ -46,6 +50,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall compatible",
         "carton": "Box quantity as currently defined",
         "lid": "Fits 8 oz, 12 oz and 16 oz cups",
+        "quote_price": 39.90,
     },
     {
         "id": "DW8",
@@ -54,6 +59,7 @@ PUBLIC_PRODUCTS = [
         "type": "Double Wall",
         "carton": "500 cups per box",
         "lid": "90mm universal lid compatible",
+        "quote_price": 45.00,
     },
     {
         "id": "DW12",
@@ -62,6 +68,7 @@ PUBLIC_PRODUCTS = [
         "type": "Double Wall",
         "carton": "500 cups per box",
         "lid": "90mm universal lid compatible",
+        "quote_price": 50.00,
     },
     {
         "id": "DW16",
@@ -70,6 +77,7 @@ PUBLIC_PRODUCTS = [
         "type": "Double Wall",
         "carton": "500 cups per box",
         "lid": "90mm universal lid compatible",
+        "quote_price": 60.00,
     },
     {
         "id": "DWLID",
@@ -78,6 +86,7 @@ PUBLIC_PRODUCTS = [
         "type": "Double Wall compatible",
         "carton": "Box quantity as currently defined",
         "lid": "Fits 8 oz, 12 oz and 16 oz cups",
+        "quote_price": 45.00,
     },
 ]
 
@@ -380,6 +389,97 @@ def quick_order_table(selected):
     """
 
 
+def quotation_lines(selected):
+    rows = ""
+    total = 0
+    for item in selected:
+        product = item["product"]
+        unit_price = float(product["quote_price"])
+        subtotal = unit_price * item["boxes"]
+        total += subtotal
+        note = f"<small>{esc(item['note'])}</small>" if item["note"] else ""
+        rows += f"""
+        <tr>
+          <td>{esc(product["name"])}{note}</td>
+          <td>{esc(product["size"])}</td>
+          <td>{esc(product["type"])}</td>
+          <td>{esc(item["boxes"])}</td>
+          <td>{money(unit_price)}</td>
+          <td>{money(subtotal)}</td>
+        </tr>
+        """
+    return rows, total
+
+
+def quotation_page(quote_number, quote_date, form_data, selected):
+    rows, total = quotation_lines(selected)
+    delivery = form_data.get("delivery_suburb") or ""
+    message = form_data.get("message") or ""
+    return f"""
+    <section class="quotation-page">
+      <div class="quotation-actions no-print">
+        <button class="button primary" type="button" onclick="window.print()">Print Quotation</button>
+        <a class="button ghost" href="/">Back to Home</a>
+      </div>
+
+      <div class="quotation-document">
+        <header class="quotation-header">
+          <div>
+            <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
+            <h1>Quotation Draft</h1>
+            <p>This is an indicative quotation. Final price is subject to stock availability, delivery area and order confirmation.</p>
+          </div>
+          <dl>
+            <div><dt>Quotation number</dt><dd>{esc(quote_number)}</dd></div>
+            <div><dt>Quotation date</dt><dd>{esc(quote_date)}</dd></div>
+            <div><dt>Validity</dt><dd>Valid for 7 days.</dd></div>
+          </dl>
+        </header>
+
+        <section class="quotation-customer">
+          <h2>Customer Details</h2>
+          <dl>
+            <div><dt>Business name</dt><dd>{esc(form_data.get("business_name"))}</dd></div>
+            <div><dt>Contact person</dt><dd>{esc(form_data.get("contact_name"))}</dd></div>
+            <div><dt>Phone</dt><dd>{esc(form_data.get("phone"))}</dd></div>
+            <div><dt>Email</dt><dd>{esc(form_data.get("email"))}</dd></div>
+            <div><dt>Delivery suburb / postcode</dt><dd>{esc(delivery)}</dd></div>
+          </dl>
+        </section>
+
+        <section class="quotation-lines">
+          <h2>Selected Products</h2>
+          <div class="quotation-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Product name</th>
+                  <th>Size</th>
+                  <th>Type</th>
+                  <th>Boxes requested</th>
+                  <th>Unit price</th>
+                  <th>Line subtotal</th>
+                </tr>
+              </thead>
+              <tbody>{rows}</tbody>
+              <tfoot>
+                <tr><th colspan="5">Total amount</th><td>{money(total)}</td></tr>
+              </tfoot>
+            </table>
+          </div>
+        </section>
+
+        <section class="quotation-notes">
+          <h2>Notes</h2>
+          <p>Payment terms: To be confirmed.</p>
+          <p>Delivery fee may apply depending on location and order quantity.</p>
+          <p>{esc(message) if message else "No special request provided."}</p>
+        </section>
+      </div>
+    </section>
+    """
+
+
 class App(BaseHTTPRequestHandler):
     def do_GET(self):
         self.route()
@@ -616,6 +716,18 @@ class App(BaseHTTPRequestHandler):
     def quote(self):
         if self.command == "POST":
             f = self.form()
+            selected = parse_quick_order_items(f.get("items"))
+            if not selected:
+                body = """
+                <section class="panel narrow quote-panel">
+                  <div class="quote-empty">
+                    <strong>No products selected yet.</strong>
+                    <p>Please choose at least one product from Quick Order before submitting an enquiry.</p>
+                    <a class="button primary" href="/#quick-order">Choose Products</a>
+                  </div>
+                </section>
+                """
+                return self.respond(layout("Request Quote", body, self.is_authed()))
             order_summary = f.get("order_summary") or f.get("product_interest") or ""
             delivery = f.get("delivery_suburb") or ""
             customer_message = f.get("message") or ""
@@ -628,7 +740,7 @@ class App(BaseHTTPRequestHandler):
                 message_parts.append(f"Customer message:\n{customer_message}")
             saved_message = "\n\n".join(message_parts) if message_parts else customer_message
             with db() as conn:
-                conn.execute(
+                cur = conn.execute(
                     """
                     INSERT INTO quote_requests
                     (business_name, contact_name, email, phone, product_interest, monthly_volume, message)
@@ -644,16 +756,14 @@ class App(BaseHTTPRequestHandler):
                         saved_message,
                     ),
                 )
-            body = """
-            <section class="panel narrow">
-              <h1>Thanks, your quote request has been received.</h1>
-              <p>Admin users can review it in the quote request inbox.</p>
-              <a class="button" href="/">Back to catalogue</a>
-            </section>
-            """
-            return self.respond(layout("Quote Sent", body, self.is_authed()))
+                quote_id = cur.lastrowid
+            today = date.today()
+            quote_number = f"AQP-{today:%Y%m%d}-{quote_id:04d}"
+            body = quotation_page(quote_number, today.isoformat(), f, selected)
+            return self.respond(layout("Quotation Draft", body, self.is_authed()))
         query = parse_qs(urlparse(self.path).query)
-        selected = parse_quick_order_items(query.get("items", [""])[0])
+        items_value = query.get("items", [""])[0]
+        selected = parse_quick_order_items(items_value)
         summary_text = quick_order_summary_text(selected)
         summary_table = quick_order_table(selected)
         total_boxes = sum(item["boxes"] for item in selected)
@@ -668,6 +778,7 @@ class App(BaseHTTPRequestHandler):
             <p class="final-price-note">Final price will be confirmed based on quantity, delivery area and availability.</p>
           </div>
           <form method="post" class="form quote-form">
+            <input type="hidden" name="items" value="{esc(items_value)}">
             <textarea hidden name="product_interest">{esc(summary_text)}</textarea>
             <textarea hidden name="order_summary">{esc(summary_text)}</textarea>
             <input type="hidden" name="monthly_volume" value="{esc(f'{total_boxes} boxes requested' if total_boxes else '')}">
