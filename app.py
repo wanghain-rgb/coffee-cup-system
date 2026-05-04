@@ -463,7 +463,7 @@ def quotation_page(quote_number, quote_date, form_data, selected):
               </thead>
               <tbody>{rows}</tbody>
               <tfoot>
-                <tr><th colspan="5">Total amount</th><td>{money(total)}</td></tr>
+                <tr><th colspan="5">Estimated total for your order</th><td>{money(total)}</td></tr>
               </tfoot>
             </table>
           </div>
@@ -473,7 +473,24 @@ def quotation_page(quote_number, quote_date, form_data, selected):
           <h2>Notes</h2>
           <p>Payment terms: To be confirmed.</p>
           <p>Delivery fee may apply depending on location and order quantity.</p>
+          <p>Prices may vary based on stock and demand.</p>
           <p>{esc(message) if message else "No special request provided."}</p>
+        </section>
+
+        <section class="quotation-next no-print">
+          <div>
+            <h2>Ready to proceed?</h2>
+            <p>Confirm your order enquiry or speak with us directly so we can lock in availability and final pricing.</p>
+          </div>
+          <div class="quotation-next-actions">
+            <a class="button primary" href="mailto:stone.wang@aureapackaging.com.au?subject=Confirm%20Quotation%20{esc(quote_number)}">Confirm This Order</a>
+            <a class="button ghost" href="mailto:stone.wang@aureapackaging.com.au">Contact Us</a>
+            <a class="button ghost" href="tel:0412345678">Call Now</a>
+          </div>
+          <div class="quotation-contact">
+            <a href="tel:0412345678">0412 345 678</a>
+            <a href="mailto:stone.wang@aureapackaging.com.au">stone.wang@aureapackaging.com.au</a>
+          </div>
         </section>
       </div>
     </section>
