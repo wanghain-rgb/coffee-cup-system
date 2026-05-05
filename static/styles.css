@@ -578,17 +578,27 @@ textarea:disabled {
   align-items: center;
   gap: 14px;
   min-width: 0;
+  position: relative;
+}
+
+.quick-thumb-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 72px;
 }
 
 .quick-thumb {
   width: 72px;
   height: 72px;
   object-fit: contain;
-  flex: 0 0 72px;
   padding: 6px;
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid rgba(216, 168, 77, 0.34);
   border-radius: 8px;
+}
+
+.quick-preview {
+  display: none;
 }
 
 .quick-order-item strong {
@@ -1187,6 +1197,33 @@ footer {
   }
 }
 
+@media (hover: hover) and (pointer: fine) {
+  .quick-preview {
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 16px);
+    z-index: 30;
+    display: block;
+    width: clamp(220px, 22vw, 280px);
+    height: clamp(220px, 22vw, 280px);
+    padding: 16px;
+    object-fit: contain;
+    background: #fff;
+    border: 1px solid rgba(216, 168, 77, 0.34);
+    border-radius: 12px;
+    box-shadow: 0 22px 55px rgba(0, 0, 0, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) scale(0.96);
+    transition: opacity 160ms ease, transform 160ms ease;
+  }
+
+  .quick-thumb-wrap:hover .quick-preview {
+    opacity: 1;
+    transform: translateY(-50%) scale(1);
+  }
+}
+
 @media (max-width: 640px) {
   .topbar {
     align-items: flex-start;
@@ -1270,6 +1307,10 @@ footer {
 
   .quick-product {
     align-items: flex-start;
+  }
+
+  .quick-preview {
+    display: none;
   }
 
   .quick-order-actions {

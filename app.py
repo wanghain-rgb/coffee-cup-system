@@ -310,7 +310,10 @@ def quick_order_rows():
         rows += f"""
         <article class="quick-order-item" data-product-row>
           <div class="quick-product">
-            <img class="quick-thumb" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
+            <span class="quick-thumb-wrap">
+              <img class="quick-thumb" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
+              <img class="quick-preview" src="{esc(product["image"])}" alt="">
+            </span>
             <div>
               <strong>{esc(product["name"])}</strong>
               <span>{esc(product["size"])} &middot; {esc(product["type"])}</span>
