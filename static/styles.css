@@ -680,10 +680,39 @@ textarea:disabled {
 }
 
 .quick-order-item {
+  position: relative;
   padding: 20px;
   border: 1px solid rgba(216, 168, 77, 0.28);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.06);
+  transition: background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+.quick-order-item.is-selected {
+  border-color: rgba(242, 209, 136, 0.92);
+  background: rgba(22, 81, 63, 0.54);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.18), inset 0 0 0 1px rgba(216, 168, 77, 0.18);
+}
+
+.selected-badge {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 1;
+  display: none;
+  padding: 5px 9px;
+  color: var(--green-950);
+  background: var(--gold-soft);
+  border: 1px solid rgba(216, 168, 77, 0.55);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quick-order-item.is-selected .selected-badge {
+  display: inline-flex;
 }
 
 .quick-product {

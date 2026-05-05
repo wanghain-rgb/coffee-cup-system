@@ -309,6 +309,7 @@ def quick_order_rows():
         product_id = esc(product["id"])
         rows += f"""
         <article class="quick-order-item" data-product-row>
+          <span class="selected-badge">Selected</span>
           <div class="quick-product">
             <span class="quick-thumb-wrap">
               <img class="quick-thumb" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
@@ -872,10 +873,21 @@ class App(BaseHTTPRequestHandler):
             const quickOrderForm = document.querySelector(".quick-order-form");
             const quickOrderItems = document.getElementById("quick_order_items");
             const quickOrderWarning = document.getElementById("quick_order_warning");
+            const quickOrderQuantityInputs = document.querySelectorAll("[data-product-id]");
+
+            quickOrderQuantityInputs.forEach((input) => {{
+              input.addEventListener("input", () => {{
+                const row = input.closest("[data-product-row]");
+                const boxes = Number.parseInt(input.value || "0", 10);
+                if (row) {{
+                  row.classList.toggle("is-selected", boxes > 0);
+                }}
+              }});
+            }});
 
             quickOrderForm.addEventListener("submit", (event) => {{
               const selected = [];
-              document.querySelectorAll("[data-product-id]").forEach((input) => {{
+              quickOrderQuantityInputs.forEach((input) => {{
                 const boxes = Number.parseInt(input.value || "0", 10);
                 if (boxes > 0) {{
                   const id = input.dataset.productId;
