@@ -265,7 +265,7 @@ def layout(title, body, authed=False):
     <body>
       <header class="topbar">
         <a class="brand" href="/">
-          <img class="brand-logo" src="/static/aurea-logo-light.png" alt="AUREA Packaging Supply Pty Ltd">
+          <img class="brand-logo" src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
           <span><strong>AUREA</strong><small>Packaging Supply Pty Ltd</small></span>
         </a>
         <nav>
@@ -652,7 +652,6 @@ def quotation_page(quote_number, quote_date, form_data, selected, email_sent=Fal
           <div>
             <div class="document-brand">
               <img src="/static/aurea-logo-light.png" alt="AUREA Packaging Supply Pty Ltd">
-              <span>AUREA PACKAGING SUPPLY PTY LTD</span>
             </div>
             <h1>Quotation Draft</h1>
             <p>This is an indicative quotation. Final price is subject to stock availability, delivery area and order confirmation.</p>
@@ -961,7 +960,6 @@ class App(BaseHTTPRequestHandler):
         <section class="panel narrow quote-panel">
           <div class="document-brand quote-brand">
             <img src="/static/aurea-logo-light.png" alt="AUREA Packaging Supply Pty Ltd">
-            <span>AUREA PACKAGING SUPPLY PTY LTD</span>
           </div>
           <h1>Quick Order Enquiry</h1>
           <div class="quote-summary">

@@ -224,26 +224,19 @@ main {
 .document-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin: 0 0 14px;
-  color: var(--green-950);
-  font-size: 13px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  line-height: 1.25;
-  text-transform: uppercase;
+  margin: 0 0 18px;
 }
 
 .document-brand img {
-  width: 58px;
-  height: 58px;
+  width: clamp(220px, 24vw, 280px);
+  max-height: 96px;
+  height: auto;
   object-fit: contain;
   flex: 0 0 auto;
-  border-radius: 50%;
 }
 
 .quote-brand {
-  color: var(--gold-soft);
+  margin-bottom: 20px;
 }
 
 .benefits {
@@ -1318,13 +1311,12 @@ footer {
   }
 
   .document-brand {
-    gap: 12px;
-    font-size: 12px;
+    margin-bottom: 16px;
   }
 
   .document-brand img {
-    width: 52px;
-    height: 52px;
+    width: clamp(180px, 58vw, 220px);
+    max-height: 86px;
   }
 
   .estimate-row {
@@ -1417,6 +1409,11 @@ footer {
 
   .quotation-header {
     grid-template-columns: 1.2fr 0.8fr;
+  }
+
+  .document-brand img {
+    width: 220px;
+    max-height: 82px;
   }
 
   .quotation-table {
