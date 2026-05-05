@@ -793,9 +793,54 @@ class App(BaseHTTPRequestHandler):
             <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
             <h1>Premium Coffee Cups &amp; Packaging for Cafes</h1>
             <p>Fast delivery across Melbourne. Best pricing based on quantity.</p>
+            <ul class="hero-trust">
+              <li><span>&#10003;</span>Bulk pricing for cafes</li>
+              <li><span>&#10003;</span>Fast delivery across Melbourne</li>
+              <li><span>&#10003;</span>Reliable supply for takeaway shops</li>
+            </ul>
             <div class="hero-actions">
               <a class="button primary" href="#quick-order">Get Best Price Now</a>
             </div>
+          </div>
+        </section>
+
+        <section class="category-section">
+          <div class="section-head">
+            <p class="eyebrow">Cafe Supply Range</p>
+            <h2>Products for Your Cafe</h2>
+            <p>Choose the packaging essentials you need, then send one quick enquiry for final B2B pricing.</p>
+          </div>
+          <div class="category-grid">
+            <a class="category-card" href="#quick-order">
+              <img src="/static/single-wall-12oz.png" alt="">
+              <strong>Coffee Cups</strong>
+              <span>Single and double wall kraft cups for everyday takeaway coffee.</span>
+            </a>
+            <a class="category-card" href="#quick-order">
+              <img src="/static/lid-90mm.png" alt="">
+              <strong>Lids</strong>
+              <span>90mm compatible lids for core 8 oz, 12 oz and 16 oz cup sizes.</span>
+            </a>
+            <a class="category-card" href="#quick-order">
+              <span class="category-icon">CH</span>
+              <strong>Cup Holders</strong>
+              <span>Carry trays and holders for busy cafe and delivery service.</span>
+            </a>
+            <a class="category-card" href="#quick-order">
+              <span class="category-icon">PB</span>
+              <strong>Paper Bags</strong>
+              <span>Takeaway bags for food, retail and cafe counter orders.</span>
+            </a>
+            <a class="category-card" href="#quick-order">
+              <span class="category-icon">ST</span>
+              <strong>Straws</strong>
+              <span>Simple drink accessories for cold beverage service.</span>
+            </a>
+            <a class="category-card" href="#quick-order">
+              <span class="category-icon">NP</span>
+              <strong>Napkins</strong>
+              <span>Practical table and takeaway napkins for daily operations.</span>
+            </a>
           </div>
         </section>
 
@@ -854,10 +899,10 @@ class App(BaseHTTPRequestHandler):
         </section>
 
         <section class="why-section">
-          <article><strong>Fast Delivery</strong><span>Melbourne supply for cafes and takeaway businesses.</span></article>
-          <article><strong>Reliable Quality</strong><span>Durable kraft cups and compatible lids.</span></article>
-          <article><strong>Bulk Pricing</strong><span>Best pricing based on order quantity.</span></article>
-          <article><strong>Local Supplier</strong><span>Speak directly with a Melbourne packaging supplier.</span></article>
+          <article><span class="feature-icon">FD</span><strong>Fast Delivery</strong><span>Melbourne supply for cafes and takeaway businesses.</span></article>
+          <article><span class="feature-icon">BP</span><strong>Bulk Pricing</strong><span>Best pricing based on carton quantity and delivery area.</span></article>
+          <article><span class="feature-icon">RS</span><strong>Reliable Supply</strong><span>Consistent kraft cups and lids for busy takeaway shops.</span></article>
+          <article><span class="feature-icon">EO</span><strong>Eco-friendly Options</strong><span>Practical packaging options with a cleaner kraft look.</span></article>
         </section>
 
         <section id="products" class="section-head product-heading">
@@ -894,6 +939,18 @@ class App(BaseHTTPRequestHandler):
             <a href="tel:0412345678">0412 345 678</a>
             <a href="mailto:stone.wang@aureapackaging.com.au">stone.wang@aureapackaging.com.au</a>
             <span>Melbourne, Australia</span>
+          </div>
+        </section>
+
+        <section class="final-cta">
+          <div>
+            <p class="eyebrow">Ready to Order?</p>
+            <h2>Ready to order for your cafe?</h2>
+            <p>Send your product quantities once and we will confirm availability, delivery details and the best final price.</p>
+          </div>
+          <div class="final-cta-actions">
+            <a class="button primary" href="#quick-order">Get Best Price Now</a>
+            <a class="button ghost" href="#contact">Contact Us</a>
           </div>
         </section>
         """
