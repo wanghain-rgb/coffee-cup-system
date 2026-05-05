@@ -39,7 +39,7 @@ a {
 }
 
 .topbar {
-  min-height: 74px;
+  min-height: 92px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -56,15 +56,15 @@ a {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   color: var(--gold-soft);
   font-weight: 800;
   text-decoration: none;
 }
 
 .brand-logo {
-  width: 48px;
-  height: 48px;
+  width: 80px;
+  height: 80px;
   object-fit: contain;
   flex: 0 0 auto;
   border-radius: 50%;
@@ -219,6 +219,31 @@ main {
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.document-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 14px;
+  color: var(--green-950);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.document-brand img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.quote-brand {
+  color: var(--gold-soft);
 }
 
 .benefits {
@@ -1231,8 +1256,8 @@ footer {
   }
 
   .brand-logo {
-    width: 42px;
-    height: 42px;
+    width: 58px;
+    height: 58px;
   }
 
   nav {
@@ -1290,6 +1315,16 @@ footer {
 
   .quote-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .document-brand {
+    gap: 12px;
+    font-size: 12px;
+  }
+
+  .document-brand img {
+    width: 52px;
+    height: 52px;
   }
 
   .estimate-row {

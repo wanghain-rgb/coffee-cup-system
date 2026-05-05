@@ -53,7 +53,7 @@ PUBLIC_PRODUCTS = [
         "name": "90mm Plastic Lid",
         "size": "90mm lids",
         "type": "Single Wall compatible",
-        "carton": "Box quantity as currently defined",
+        "carton": "1000 lids per box",
         "lid": "Fits 8 oz, 12 oz and 16 oz cups",
         "image": "/static/lid-90mm.png",
         "quote_price": 39.90,
@@ -93,7 +93,7 @@ PUBLIC_PRODUCTS = [
         "name": "90mm Plastic Lid",
         "size": "90mm lids",
         "type": "Double Wall compatible",
-        "carton": "Box quantity as currently defined",
+        "carton": "1000 lids per box",
         "lid": "Fits 8 oz, 12 oz and 16 oz cups",
         "image": "/static/lid-90mm.png",
         "quote_price": 45.00,
@@ -650,7 +650,10 @@ def quotation_page(quote_number, quote_date, form_data, selected, email_sent=Fal
       <div class="quotation-document">
         <header class="quotation-header">
           <div>
-            <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
+            <div class="document-brand">
+              <img src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
+              <span>AUREA PACKAGING SUPPLY PTY LTD</span>
+            </div>
             <h1>Quotation Draft</h1>
             <p>This is an indicative quotation. Final price is subject to stock availability, delivery area and order confirmation.</p>
           </div>
@@ -956,7 +959,10 @@ class App(BaseHTTPRequestHandler):
         disabled = "" if selected else "disabled"
         body = f"""
         <section class="panel narrow quote-panel">
-          <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
+          <div class="document-brand quote-brand">
+            <img src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
+            <span>AUREA PACKAGING SUPPLY PTY LTD</span>
+          </div>
           <h1>Quick Order Enquiry</h1>
           <div class="quote-summary">
             <h2>Selected products</h2>
