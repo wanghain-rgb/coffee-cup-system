@@ -25,6 +25,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "image": "/static/single-wall-8oz.png",
         "quote_price": 49.90,
     },
     {
@@ -34,6 +35,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "image": "/static/single-wall-12oz.png",
         "quote_price": 61.90,
     },
     {
@@ -43,6 +45,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "image": "/static/single-wall-16oz.png",
         "quote_price": 79.90,
     },
     {
@@ -52,6 +55,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall compatible",
         "carton": "Box quantity as currently defined",
         "lid": "Fits 8 oz, 12 oz and 16 oz cups",
+        "image": "/static/lid-90mm.png",
         "quote_price": 39.90,
     },
     {
@@ -59,8 +63,9 @@ PUBLIC_PRODUCTS = [
         "name": "Double Wall Kraft Coffee Cup",
         "size": "8 oz",
         "type": "Double Wall",
-        "carton": "500 cups per box",
+        "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "image": "/static/double-wall-8oz.png",
         "quote_price": 45.00,
     },
     {
@@ -68,8 +73,9 @@ PUBLIC_PRODUCTS = [
         "name": "Double Wall Kraft Coffee Cup",
         "size": "12 oz",
         "type": "Double Wall",
-        "carton": "500 cups per box",
+        "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "image": "/static/double-wall-12oz.png",
         "quote_price": 50.00,
     },
     {
@@ -77,8 +83,9 @@ PUBLIC_PRODUCTS = [
         "name": "Double Wall Kraft Coffee Cup",
         "size": "16 oz",
         "type": "Double Wall",
-        "carton": "500 cups per box",
+        "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
+        "image": "/static/double-wall-16oz.png",
         "quote_price": 60.00,
     },
     {
@@ -88,6 +95,7 @@ PUBLIC_PRODUCTS = [
         "type": "Double Wall compatible",
         "carton": "Box quantity as currently defined",
         "lid": "Fits 8 oz, 12 oz and 16 oz cups",
+        "image": "/static/lid-90mm.png",
         "quote_price": 45.00,
     },
 ]
@@ -257,7 +265,7 @@ def layout(title, body, authed=False):
     <body>
       <header class="topbar">
         <a class="brand" href="/">
-          <span class="brand-mark">A</span>
+          <img class="brand-logo" src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
           <span><strong>AUREA</strong><small>Packaging Supply Pty Ltd</small></span>
         </a>
         <nav>
@@ -301,9 +309,12 @@ def quick_order_rows():
         product_id = esc(product["id"])
         rows += f"""
         <article class="quick-order-item" data-product-row>
-          <div>
-            <strong>{esc(product["name"])}</strong>
-            <span>{esc(product["size"])} &middot; {esc(product["type"])}</span>
+          <div class="quick-product">
+            <img class="quick-thumb" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
+            <div>
+              <strong>{esc(product["name"])}</strong>
+              <span>{esc(product["size"])} &middot; {esc(product["type"])}</span>
+            </div>
           </div>
           <div>{esc(product["carton"])}</div>
           <div>{esc(product["lid"])}</div>
