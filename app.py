@@ -17,6 +17,13 @@ DB_PATH = os.path.join(os.path.dirname(__file__), "cupflow.sqlite3")
 SECRET = os.environ.get("CUPFLOW_SECRET", "change-this-local-dev-secret")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
+SITE_URL = "https://aureapackaging.com.au"
+SEO_TITLE = "Premium Coffee Cups & Packaging Supplies Melbourne | AUREA Packaging"
+SEO_DESCRIPTION = (
+    "Bulk coffee cups, lids, takeaway packaging and cafe supplies in Melbourne. "
+    "Fast delivery, reliable supply and competitive pricing for cafes and takeaway shops."
+)
+SEO_IMAGE = f"{SITE_URL}/static/hero-cups.png"
 PUBLIC_PRODUCTS = [
     {
         "id": "SW8",
@@ -239,7 +246,7 @@ def verify(signed):
     return value if hmac.compare_digest(digest, expected) else None
 
 
-def layout(title, body, authed=False):
+def layout(title, body, authed=False, noindex=False):
     admin_links = ""
     if authed:
         admin_links = """
@@ -254,12 +261,44 @@ def layout(title, body, authed=False):
         """
     else:
         admin_links = '<a href="/admin/login">Admin</a>'
+    page_title = SEO_TITLE if title == "Product Catalogue" else f"{esc(title)} | AUREA Packaging"
+    robots_meta = '<meta name="robots" content="noindex, nofollow">' if noindex else ""
+    seo_meta = "" if noindex else f"""
+      <meta name="description" content="{esc(SEO_DESCRIPTION)}">
+      <link rel="canonical" href="{SITE_URL}/">
+      <meta property="og:title" content="{esc(SEO_TITLE)}">
+      <meta property="og:description" content="{esc(SEO_DESCRIPTION)}">
+      <meta property="og:type" content="website">
+      <meta property="og:url" content="{SITE_URL}/">
+      <meta property="og:site_name" content="AUREA Packaging Supply">
+      <meta property="og:image" content="{SEO_IMAGE}">
+      <meta name="twitter:card" content="summary_large_image">
+      <meta name="twitter:title" content="{esc(SEO_TITLE)}">
+      <meta name="twitter:description" content="{esc(SEO_DESCRIPTION)}">
+      <meta name="twitter:image" content="{SEO_IMAGE}">
+      <script type="application/ld+json">{{
+        "@context": "https://schema.org",
+        "@type": "LocalBusiness",
+        "name": "AUREA Packaging Supply Pty Ltd",
+        "url": "{SITE_URL}/",
+        "email": "info@aureapackaging.com.au",
+        "telephone": "0497278099",
+        "address": {{
+          "@type": "PostalAddress",
+          "addressLocality": "Melbourne",
+          "addressCountry": "AU"
+        }},
+        "description": "Supplier of coffee cups, lids and takeaway packaging products for cafes and food businesses in Melbourne and across Australia."
+      }}</script>"""
     return f"""<!doctype html>
     <html lang="en">
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
-      <title>{esc(title)} | {APP_NAME}</title>
+      <title>{page_title}</title>
+      {robots_meta}
+      {seo_meta}
+      <link rel="icon" href="/static/aurea-logo.png">
       <link rel="stylesheet" href="/static/styles.css">
     </head>
     <body>
@@ -741,6 +780,8 @@ class App(BaseHTTPRequestHandler):
         routes = {
             "/": self.catalogue,
             "/quote": self.quote,
+            "/robots.txt": self.robots_txt,
+            "/sitemap.xml": self.sitemap_xml,
             "/admin/login": self.login,
             "/admin/logout": self.logout,
             "/admin": self.admin,
@@ -780,6 +821,23 @@ class App(BaseHTTPRequestHandler):
                 self.send_header("Set-Cookie", cookie)
         self.end_headers()
         self.wfile.write(content.encode("utf-8"))
+
+    def robots_txt(self):
+        content = f"""User-agent: *
+Allow: /
+
+Sitemap: {SITE_URL}/sitemap.xml
+"""
+        self.respond(content, content_type="text/plain")
+
+    def sitemap_xml(self):
+        content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>{SITE_URL}/</loc></url>
+  <url><loc>{SITE_URL}/quote</loc></url>
+</urlset>
+"""
+        self.respond(content, content_type="application/xml")
 
     def redirect(self, location):
         self.send_response(303)
@@ -1079,11 +1137,11 @@ class App(BaseHTTPRequestHandler):
           </form>
         </section>
         """
-        self.respond(layout("Admin Login", body, False))
+        self.respond(layout("Admin Login", body, False, noindex=True))
 
     def logout(self):
         self.respond(
-            layout("Logged out", '<section class="panel narrow"><h1>Logged out</h1><a class="button" href="/">Home</a></section>'),
+            layout("Logged out", '<section class="panel narrow"><h1>Logged out</h1><a class="button" href="/">Home</a></section>', noindex=True),
             cookies=["cupflow_session=; Max-Age=0; Path=/"],
         )
 
@@ -1107,7 +1165,7 @@ class App(BaseHTTPRequestHandler):
           <p>Create product masters, add purchase batches to stock, enter sales orders, and use FIFO landed cost to calculate gross profit.</p>
         </section>
         """
-        self.respond(layout("Admin Dashboard", body, True))
+        self.respond(layout("Admin Dashboard", body, True, noindex=True))
 
     def admin_products(self):
         if not self.require_admin():
@@ -1152,7 +1210,7 @@ class App(BaseHTTPRequestHandler):
           </form>
         </section>
         """
-        self.respond(layout("Product Master", body, True))
+        self.respond(layout("Product Master", body, True, noindex=True))
 
     def admin_customers(self):
         if not self.require_admin():
@@ -1190,7 +1248,7 @@ class App(BaseHTTPRequestHandler):
           </form>
         </section>
         """
-        self.respond(layout("Customer Master", body, True))
+        self.respond(layout("Customer Master", body, True, noindex=True))
 
     def admin_purchases(self):
         if not self.require_admin():
@@ -1260,7 +1318,7 @@ class App(BaseHTTPRequestHandler):
           </form>
         </section>
         """
-        self.respond(layout("Purchase Batches", body, True))
+        self.respond(layout("Purchase Batches", body, True, noindex=True))
 
     def admin_inventory(self):
         if not self.require_admin():
@@ -1281,7 +1339,7 @@ class App(BaseHTTPRequestHandler):
         <section class="section-head"><h1>Inventory Balance</h1><p>On-hand cartons and stock value from remaining purchase batches.</p></section>
         {table(["SKU", "Product", "On hand cartons", "Stock value"], inv_rows)}
         """
-        self.respond(layout("Inventory Balance", body, True))
+        self.respond(layout("Inventory Balance", body, True, noindex=True))
 
     def admin_sales(self):
         if not self.require_admin():
@@ -1362,7 +1420,7 @@ class App(BaseHTTPRequestHandler):
           </form>
         </section>
         """
-        self.respond(layout("Sales Orders", body, True))
+        self.respond(layout("Sales Orders", body, True, noindex=True))
 
     def allocate_fifo(self, conn, product_id, qty):
         remaining = qty
@@ -1413,7 +1471,7 @@ class App(BaseHTTPRequestHandler):
         <section class="section-head"><h1>Quote Requests</h1><p>Inbox for public website enquiries.</p></section>
         {table(["Created", "Status", "Business", "Contact", "Email", "Phone", "Products", "Volume", "Message"], quote_rows)}
         """
-        self.respond(layout("Quote Requests", body, True))
+        self.respond(layout("Quote Requests", body, True, noindex=True))
 
     def static_file(self, path):
         rel = path.removeprefix("/static/").replace("/", os.sep)
