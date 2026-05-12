@@ -296,6 +296,7 @@ def layout(title, body, authed=False, noindex=False):
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <title>{page_title}</title>
+      <meta name="google-site-verification" content="F7E9xybe9tWEfOtvIs2FOdnGqitnThBp62z9NdeDtuI" />
       {robots_meta}
       {seo_meta}
       <link rel="icon" href="/static/aurea-logo.png">
