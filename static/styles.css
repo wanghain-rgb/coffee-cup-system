@@ -1544,6 +1544,15 @@ th {
   font-weight: 700;
 }
 
+.notice {
+  padding: 12px 14px;
+  color: var(--green-950);
+  background: #eefaf3;
+  border: 1px solid rgba(22, 81, 63, 0.24);
+  border-radius: 6px;
+  font-weight: 800;
+}
+
 footer {
   width: min(94vw, 1500px);
   margin: 0 auto;
