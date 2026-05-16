@@ -52,6 +52,15 @@ python app.py
 
 The app creates `cupflow.sqlite3` on first run and seeds a few demo products and one demo customer.
 
-Important production note: SQLite stored on Render's normal/free filesystem is not persistent across redeploys, restarts, or spin-downs. For production business data, use PostgreSQL or attach a Render persistent disk and point the application database path there.
+Important production note: when `DATABASE_URL` is set, the app uses PostgreSQL. When `DATABASE_URL` is not set, it falls back to local SQLite at `cupflow.sqlite3` for development. SQLite stored on Render's normal/free filesystem is not persistent across redeploys, restarts, or spin-downs. For production business data, use PostgreSQL or attach a Render persistent disk and point the application database path there.
+
+To migrate a local SQLite database into PostgreSQL:
+
+```powershell
+$env:DATABASE_URL="postgres://..."
+python migrate_sqlite_to_postgres.py .\cupflow.sqlite3
+```
+
+Use Render's internal `DATABASE_URL` in production and do not commit database files or credentials.
 
 This is intentionally an MVP. Logical next steps would be product/customer editing, multi-line orders, invoice PDF export, quote-to-customer conversion, and role-based users.
