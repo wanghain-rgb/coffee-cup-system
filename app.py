@@ -2007,20 +2007,25 @@ Sitemap: {SITE_URL}/sitemap.xml
                 <tbody>{line_rows}</tbody>
               </table>
             </div>
-            <section class="invoice-totals">
-              <div><span>Subtotal excluding GST</span><strong>{money(invoice["subtotal_ex_gst"])}</strong></div>
-              <div><span>GST</span><strong>{money(invoice["gst_amount"])}</strong></div>
-              <div><span>Total including GST</span><strong>{money(invoice["total_inc_gst"])}</strong></div>
-              <div><span>Total paid</span><strong>{money(invoice["total_paid"])}</strong></div>
-              <div class="balance"><span>Balance due</span><strong>{money(invoice["balance_due"])}</strong></div>
+            <section class="invoice-bottom">
+              <div class="invoice-payment">
+                <h2>Payment Details</h2>
+                <p><strong>{esc(company["bank_name"])}</strong></p>
+                <p>Account name: {esc(company["account_name"])}</p>
+                <p>BSB: {esc(company["bsb"])} &middot; Account: {esc(company["account_number"])}</p>
+                <p>Payment terms: Due by {esc(invoice["due_date"])}</p>
+                <p>Payment reference: {esc(invoice["invoice_number"])}</p>
+                <p>{esc(company["payment_instructions"])}</p>
+              </div>
+              <div class="invoice-totals">
+                <div><span>Subtotal excluding GST</span><strong>{money(invoice["subtotal_ex_gst"])}</strong></div>
+                <div><span>GST</span><strong>{money(invoice["gst_amount"])}</strong></div>
+                <div><span>Total including GST</span><strong>{money(invoice["total_inc_gst"])}</strong></div>
+                <div><span>Total paid</span><strong>{money(invoice["total_paid"])}</strong></div>
+                <div class="balance"><span>Balance due</span><strong>{money(invoice["balance_due"])}</strong></div>
+              </div>
             </section>
-            <section class="invoice-payment">
-              <h2>Payment Details</h2>
-              <p><strong>{esc(company["bank_name"])}</strong></p>
-              <p>Account name: {esc(company["account_name"])}</p>
-              <p>BSB: {esc(company["bsb"])} &middot; Account: {esc(company["account_number"])}</p>
-              <p>{esc(company["payment_instructions"])}</p>
-            </section>
+            <footer class="invoice-print-footer">Invoice {esc(invoice["invoice_number"])} &middot; Due {esc(invoice["due_date"])} &middot; Balance due {money(invoice["balance_due"])}</footer>
           </div>
         </section>
         """
