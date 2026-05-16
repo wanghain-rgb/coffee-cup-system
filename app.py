@@ -260,6 +260,7 @@ def init_db():
         ensure_column(conn, "customers", "shipping_address", "shipping_address TEXT")
         ensure_column(conn, "products", "product_type", "product_type TEXT")
         ensure_column(conn, "products", "tax_type", "tax_type TEXT NOT NULL DEFAULT 'GST'")
+        ensure_column(conn, "products", "barcode", "barcode TEXT")
 
         conn.execute(
             """
@@ -1297,28 +1298,62 @@ Sitemap: {SITE_URL}/sitemap.xml
     def admin_products(self):
         if not self.require_admin():
             return
+        error = ""
+        edit_id = parse_qs(urlparse(self.path).query).get("edit", [""])[0]
         if self.command == "POST":
             f = self.form()
+            action = f.get("action") or "save"
             with db() as conn:
-                conn.execute(
-                    """
-                    INSERT INTO products (sku, name, size, product_type, qty_per_carton, sell_price, tax_type, active)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        f.get("sku"),
+                if action == "deactivate":
+                    conn.execute("UPDATE products SET active = 0 WHERE id = ?", (int(f.get("product_id")),))
+                    return self.redirect("/admin/products")
+
+                product_id = f.get("product_id")
+                sku = (f.get("sku") or "").strip()
+                duplicate = conn.execute(
+                    "SELECT id FROM products WHERE sku = ? AND (? = '' OR id != ?)",
+                    (sku, product_id or "", int(product_id or 0)),
+                ).fetchone()
+                if duplicate:
+                    error = '<p class="alert">Product code already exists. Please use a unique product code.</p>'
+                    edit_id = product_id or ""
+                else:
+                    values = (
+                        sku,
                         f.get("name"),
-                        f.get("size"),
+                        f.get("size") or "",
                         f.get("product_type"),
                         int(f.get("qty_per_carton") or 0),
                         float(f.get("sell_price") or 0),
                         f.get("tax_type") or "GST",
+                        f.get("barcode"),
                         1 if f.get("active") == "on" else 0,
-                    ),
-                )
-            return self.redirect("/admin/products")
+                    )
+                    if product_id:
+                        conn.execute(
+                            """
+                            UPDATE products
+                            SET sku = ?, name = ?, size = ?, product_type = ?, qty_per_carton = ?,
+                                sell_price = ?, tax_type = ?, barcode = ?, active = ?
+                            WHERE id = ?
+                            """,
+                            (*values, int(product_id)),
+                        )
+                    else:
+                        conn.execute(
+                            """
+                            INSERT INTO products
+                            (sku, name, size, product_type, qty_per_carton, sell_price, tax_type, barcode, active)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            values,
+                        )
+                    return self.redirect("/admin/products")
         with db() as conn:
             rows = conn.execute("SELECT * FROM products ORDER BY sku").fetchall()
+            edit_product = None
+            if edit_id:
+                edit_product = conn.execute("SELECT * FROM products WHERE id = ?", (edit_id,)).fetchone()
         product_rows = [
             [
                 esc(r["sku"]),
@@ -1328,25 +1363,43 @@ Sitemap: {SITE_URL}/sitemap.xml
                 esc(r["qty_per_carton"]),
                 money(r["sell_price"]),
                 esc(r["tax_type"] or "GST"),
+                esc(r["barcode"] or ""),
                 "Yes" if r["active"] else "No",
+                (
+                    f'<a class="mini-quote" href="/admin/products?edit={esc(r["id"])}">Edit</a> '
+                    f'<form method="post" class="inline-form" onsubmit="return confirm(\'Are you sure you want to deactivate this product? Existing historical records will be preserved.\')">'
+                    f'<input type="hidden" name="action" value="deactivate">'
+                    f'<input type="hidden" name="product_id" value="{esc(r["id"])}">'
+                    f'<button class="link-button" type="submit">Delete</button></form>'
+                ),
             ]
             for r in rows
         ]
+        p = edit_product
+        form_title = "Edit product" if p else "Add product"
+        hidden_id = f'<input type="hidden" name="product_id" value="{esc(p["id"])}">' if p else ""
+        gst_selected = "selected" if not p or (p["tax_type"] or "GST") == "GST" else ""
+        gst_free_selected = "selected" if p and p["tax_type"] == "GST Free" else ""
+        active_checked = "checked" if not p or p["active"] else ""
         body = f"""
         <section class="section-head"><h1>Product Master</h1><p>Maintain cup and lid SKUs, carton sizes and default sell prices.</p></section>
-        {table(["Code", "Name", "Size", "Type", "Carton qty", "Unit price ex GST", "Tax", "Active"], product_rows)}
+        {error}
+        {table(["Code", "Name", "Size", "Type", "Carton qty", "Unit price ex GST", "Tax", "Barcode", "Active", "Actions"], product_rows)}
         <section class="panel">
-          <h2>Add product</h2>
+          <h2>{form_title}</h2>
+          <p class="help-text">Recommended product code format: CUP-08-SW-001, CUP-12-SW-001, CUP-16-SW-001, CUP-08-DW-001, LID-90-PL-001, BAG-SM-KR-001, NAP-WH-001, STR-BK-001. Meaning: Category - Size - Type/Material - Sequence. Examples: CUP = Coffee Cup, SW = Single Wall, DW = Double Wall, LID = Lid, PL = Plastic, BAG = Bag, NAP = Napkin, STR = Straw.</p>
           <form method="post" class="form grid-form">
-            <label>Product code<input name="sku" required></label>
-            <label>Name<input name="name" required></label>
-            <label>Size<input name="size" required></label>
-            <label>Product type<input name="product_type" placeholder="Coffee cups, lids, bags"></label>
-            <label>Carton quantity<input name="qty_per_carton" type="number" required></label>
-            <label>Default unit price ex GST<input name="sell_price" type="number" step="0.01" required></label>
-            <label>Tax type<select name="tax_type"><option value="GST">GST</option><option value="GST Free">GST Free</option></select></label>
-            <label class="check"><input name="active" type="checkbox" checked> Active</label>
-            <button class="button primary" type="submit">Add product</button>
+            {hidden_id}
+            <label>Product code<input name="sku" required value="{esc(p["sku"] if p else "")}"></label>
+            <label>Name<input name="name" required value="{esc(p["name"] if p else "")}"></label>
+            <label>Size<input name="size" value="{esc(p["size"] if p else "")}"></label>
+            <label>Product type<input name="product_type" placeholder="Coffee cups, lids, bags" value="{esc(p["product_type"] if p else "")}"></label>
+            <label>Carton quantity<input name="qty_per_carton" type="number" min="0" required value="{esc(p["qty_per_carton"] if p else "")}"></label>
+            <label>Default unit price ex GST<input name="sell_price" type="number" min="0" step="0.01" required value="{esc(p["sell_price"] if p else "")}"></label>
+            <label>Tax type<select name="tax_type" required><option value="GST" {gst_selected}>GST</option><option value="GST Free" {gst_free_selected}>GST Free</option></select></label>
+            <label>Barcode value<input name="barcode" value="{esc(p["barcode"] if p else "")}"></label>
+            <label class="check"><input name="active" type="checkbox" {active_checked}> Active</label>
+            <button class="button primary" type="submit">{form_title}</button>
           </form>
         </section>
         """
