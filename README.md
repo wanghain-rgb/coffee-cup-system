@@ -52,4 +52,6 @@ python app.py
 
 The app creates `cupflow.sqlite3` on first run and seeds a few demo products and one demo customer.
 
+Important production note: SQLite stored on Render's normal/free filesystem is not persistent across redeploys, restarts, or spin-downs. For production business data, use PostgreSQL or attach a Render persistent disk and point the application database path there.
+
 This is intentionally an MVP. Logical next steps would be product/customer editing, multi-line orders, invoice PDF export, quote-to-customer conversion, and role-based users.

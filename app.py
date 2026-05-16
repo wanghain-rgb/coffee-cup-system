@@ -10,9 +10,13 @@ import os
 import smtplib
 import sqlite3
 import sys
+import traceback
 
 
 APP_NAME = "CupFlow"
+# Render's normal/free filesystem is ephemeral. If this SQLite file is stored
+# there, business data can be lost on redeploy/restart/spin-down. Use
+# PostgreSQL or a Render persistent disk for production data.
 DB_PATH = os.path.join(os.path.dirname(__file__), "cupflow.sqlite3")
 SECRET = os.environ.get("CUPFLOW_SECRET", "change-this-local-dev-secret")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
@@ -923,7 +927,12 @@ class App(BaseHTTPRequestHandler):
         handler = routes.get(path)
         if not handler:
             return self.respond("Not found", 404)
-        return handler()
+        try:
+            return handler()
+        except Exception as exc:
+            print(f"Unhandled error while serving {path}: {exc}")
+            traceback.print_exc()
+            return self.respond("Sorry, something went wrong. Please try again.", 500)
 
     def is_authed(self):
         cookie = SimpleCookie(self.headers.get("Cookie"))
@@ -1391,6 +1400,8 @@ Sitemap: {SITE_URL}/sitemap.xml
             edit_product = None
             if edit_id:
                 edit_product = conn.execute("SELECT * FROM products WHERE id = ?", (edit_id,)).fetchone()
+                if not edit_product and not form_product:
+                    error = '<p class="alert">Product not found. It may have been removed or deactivated.</p>'
         product_rows = [
             [
                 esc(r["sku"]),
@@ -1416,7 +1427,12 @@ Sitemap: {SITE_URL}/sitemap.xml
         def product_value(key, default=""):
             if not p:
                 return default
-            return p.get(key, default) if isinstance(p, dict) else p[key]
+            if isinstance(p, dict):
+                return p.get(key, default)
+            try:
+                return p[key]
+            except (IndexError, KeyError):
+                return default
 
         form_title = "Edit product" if p else "Add product"
         product_id_value = product_value("product_id") or product_value("id")
@@ -1454,6 +1470,10 @@ Sitemap: {SITE_URL}/sitemap.xml
     def admin_customers(self):
         if not self.require_admin():
             return
+        notice = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "customer":
+            notice = '<p class="notice">Customer saved successfully.</p>'
         if self.command == "POST":
             f = self.form()
             with db() as conn:
@@ -1488,7 +1508,8 @@ Sitemap: {SITE_URL}/sitemap.xml
                         """,
                         values,
                     )
-            return self.redirect("/admin/customers")
+                conn.commit()
+            return self.redirect("/admin/customers?saved=customer")
         edit_id = parse_qs(urlparse(self.path).query).get("edit", [""])[0]
         with db() as conn:
             rows = conn.execute("SELECT * FROM customers ORDER BY business_name").fetchall()
@@ -1512,6 +1533,7 @@ Sitemap: {SITE_URL}/sitemap.xml
         hidden_id = f'<input type="hidden" name="customer_id" value="{esc(c["id"])}">' if c else ""
         body = f"""
         <section class="section-head"><h1>Customer Master</h1><p>Cafe and takeaway customer records.</p></section>
+        {notice}
         {table(["Business", "ABN", "Contact", "Email", "Phone", "Billing address", "Action"], customer_rows)}
         <section class="panel">
           <h2>{form_title}</h2>
@@ -1535,35 +1557,54 @@ Sitemap: {SITE_URL}/sitemap.xml
     def admin_company(self):
         if not self.require_admin():
             return
+        notice = ""
+        error = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "company":
+            notice = '<p class="notice">Company details saved successfully.</p>'
         if self.command == "POST":
             f = self.form()
+            if not (f.get("company_name") or "").strip():
+                error = '<p class="alert">Please enter company name.</p>'
+                c = f
+            else:
+                try:
+                    with db() as conn:
+                        conn.execute(
+                            """
+                            UPDATE company_master
+                            SET company_name = ?, abn = ?, address = ?, phone = ?, email = ?, website = ?,
+                                bank_name = ?, account_name = ?, bsb = ?, account_number = ?, payment_instructions = ?
+                            WHERE id = 1
+                            """,
+                            (
+                                f.get("company_name"),
+                                f.get("abn"),
+                                f.get("address"),
+                                f.get("phone"),
+                                f.get("email"),
+                                f.get("website"),
+                                f.get("bank_name"),
+                                f.get("account_name"),
+                                f.get("bsb"),
+                                f.get("account_number"),
+                                f.get("payment_instructions"),
+                            ),
+                        )
+                        conn.commit()
+                    return self.redirect("/admin/company?saved=company")
+                except Exception as exc:
+                    print(f"Failed to save company master: {exc}")
+                    traceback.print_exc()
+                    error = '<p class="alert">Company details could not be saved. Please try again.</p>'
+                    c = f
+        else:
             with db() as conn:
-                conn.execute(
-                    """
-                    UPDATE company_master
-                    SET company_name = ?, abn = ?, address = ?, phone = ?, email = ?, website = ?,
-                        bank_name = ?, account_name = ?, bsb = ?, account_number = ?, payment_instructions = ?
-                    WHERE id = 1
-                    """,
-                    (
-                        f.get("company_name"),
-                        f.get("abn"),
-                        f.get("address"),
-                        f.get("phone"),
-                        f.get("email"),
-                        f.get("website"),
-                        f.get("bank_name"),
-                        f.get("account_name"),
-                        f.get("bsb"),
-                        f.get("account_number"),
-                        f.get("payment_instructions"),
-                    ),
-                )
-            return self.redirect("/admin/company")
-        with db() as conn:
-            c = company_master(conn)
+                c = company_master(conn)
         body = f"""
         <section class="section-head"><h1>Company Master</h1><p>Company and payment details used on printable invoices.</p></section>
+        {notice}
+        {error}
         <section class="panel">
           <form method="post" class="form grid-form">
             <label>Company name<input name="company_name" required value="{esc(c["company_name"])}"></label>
@@ -1676,6 +1717,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                             line["total_inc_gst"],
                         ),
                     )
+                conn.commit()
             return self.redirect(f"/admin/invoices/{invoice_id}")
 
         today = date.today()
@@ -1872,6 +1914,10 @@ Sitemap: {SITE_URL}/sitemap.xml
     def admin_purchases(self):
         if not self.require_admin():
             return
+        notice = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "purchase":
+            notice = '<p class="notice">Purchase batch saved successfully.</p>'
         if self.command == "POST":
             f = self.form()
             qty = int(f.get("qty_cartons") or 0)
@@ -1891,7 +1937,8 @@ Sitemap: {SITE_URL}/sitemap.xml
                     """,
                     (cur.lastrowid, int(f.get("product_id")), qty, unit_cost, freight, qty, landed),
                 )
-            return self.redirect("/admin/purchases")
+                conn.commit()
+            return self.redirect("/admin/purchases?saved=purchase")
         with db() as conn:
             opts = product_options(conn)
             rows = conn.execute(
@@ -1921,6 +1968,7 @@ Sitemap: {SITE_URL}/sitemap.xml
         ]
         body = f"""
         <section class="section-head"><h1>Purchase Batch Management</h1><p>Record inbound cartons and allocate freight into landed unit cost.</p></section>
+        {notice}
         {table(["Date", "Supplier", "Invoice", "SKU", "Product", "Purchased", "Remaining", "Unit cost", "Freight", "Landed cost"], purchase_rows)}
         <section class="panel">
           <h2>Add purchase batch</h2>
@@ -1964,6 +2012,9 @@ Sitemap: {SITE_URL}/sitemap.xml
         if not self.require_admin():
             return
         message = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "sales":
+            message = '<p class="notice">Sales order saved successfully.</p>'
         if self.command == "POST":
             f = self.form()
             product_id = int(f.get("product_id"))
@@ -1991,7 +2042,8 @@ Sitemap: {SITE_URL}/sitemap.xml
                         """,
                         (cur.lastrowid, product_id, qty, sell_price, cost_total / qty, revenue, cost_total, revenue - cost_total),
                     )
-                    return self.redirect("/admin/sales")
+                    conn.commit()
+                    return self.redirect("/admin/sales?saved=sales")
         with db() as conn:
             product_opts = product_options(conn)
             customer_opts = customer_options(conn)
