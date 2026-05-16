@@ -1974,12 +1974,12 @@ Sitemap: {SITE_URL}/sitemap.xml
           <div class="quotation-actions no-print">
             <button class="button primary" type="button" onclick="window.print()">Print / Save as PDF</button>
             <a class="button ghost" href="/admin/invoices">Back to Invoices</a>
+            <p class="print-note">For clean PDF output, turn off browser Headers and footers in print settings.</p>
           </div>
           <div class="invoice-document">
             <header class="invoice-header">
               <div>
                 <img class="invoice-logo" src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
-                <h1>Tax Invoice</h1>
               </div>
               <div class="invoice-company">
                 <strong>{esc(company["company_name"])}</strong>
@@ -1989,13 +1989,16 @@ Sitemap: {SITE_URL}/sitemap.xml
                 <span>{esc(company["website"])}</span>
               </div>
             </header>
-            <section class="invoice-meta">
-              <dl>
-                <div><dt>Invoice number</dt><dd>{esc(invoice["invoice_number"])}</dd></div>
-                <div><dt>Issue date</dt><dd>{esc(invoice["issue_date"])}</dd></div>
-                <div><dt>Due date</dt><dd>{esc(invoice["due_date"])}</dd></div>
-                <div><dt>Status</dt><dd>{esc(invoice["status"])}</dd></div>
-              </dl>
+            <section class="invoice-title-row">
+              <h1>Tax Invoice</h1>
+              <div class="invoice-meta">
+                <dl>
+                  <div><dt>Invoice number</dt><dd>{esc(invoice["invoice_number"])}</dd></div>
+                  <div><dt>Issue date</dt><dd>{esc(invoice["issue_date"])}</dd></div>
+                  <div><dt>Due date</dt><dd>{esc(invoice["due_date"])}</dd></div>
+                  <div><dt>Status</dt><dd>{esc(invoice["status"])}</dd></div>
+                </dl>
+              </div>
             </section>
             <section class="invoice-addresses">
               <div><h2>Bill to</h2><strong>{esc(invoice["business_name"])}</strong><p>{esc(bill_to)}</p><p>ABN: {esc(invoice["abn"])}</p><p>{esc(invoice["contact_name"])} &middot; {esc(invoice["email"])} &middot; {esc(invoice["phone"])}</p></div>
@@ -2008,15 +2011,6 @@ Sitemap: {SITE_URL}/sitemap.xml
               </table>
             </div>
             <section class="invoice-bottom">
-              <div class="invoice-payment">
-                <h2>Payment Details</h2>
-                <p><strong>{esc(company["bank_name"])}</strong></p>
-                <p>Account name: {esc(company["account_name"])}</p>
-                <p>BSB: {esc(company["bsb"])} &middot; Account: {esc(company["account_number"])}</p>
-                <p>Payment terms: Due by {esc(invoice["due_date"])}</p>
-                <p>Payment reference: {esc(invoice["invoice_number"])}</p>
-                <p>{esc(company["payment_instructions"])}</p>
-              </div>
               <div class="invoice-totals">
                 <div><span>Subtotal excluding GST</span><strong>{money(invoice["subtotal_ex_gst"])}</strong></div>
                 <div><span>GST</span><strong>{money(invoice["gst_amount"])}</strong></div>
@@ -2024,6 +2018,18 @@ Sitemap: {SITE_URL}/sitemap.xml
                 <div><span>Total paid</span><strong>{money(invoice["total_paid"])}</strong></div>
                 <div class="balance"><span>Balance due</span><strong>{money(invoice["balance_due"])}</strong></div>
               </div>
+            </section>
+            <section class="invoice-payment">
+              <h2>Payment Details</h2>
+              <div class="invoice-payment-grid">
+                <p><span>Bank</span><strong>{esc(company["bank_name"])}</strong></p>
+                <p><span>Account name</span><strong>{esc(company["account_name"])}</strong></p>
+                <p><span>BSB</span><strong>{esc(company["bsb"])}</strong></p>
+                <p><span>Account number</span><strong>{esc(company["account_number"])}</strong></p>
+                <p><span>Payment reference</span><strong>{esc(invoice["invoice_number"])}</strong></p>
+                <p><span>Payment terms</span><strong>Due by {esc(invoice["due_date"])}</strong></p>
+              </div>
+              <p class="invoice-payment-instructions">{esc(company["payment_instructions"])}</p>
             </section>
             <footer class="invoice-print-footer">Invoice {esc(invoice["invoice_number"])} &middot; Due {esc(invoice["due_date"])} &middot; Balance due {money(invoice["balance_due"])}</footer>
           </div>
