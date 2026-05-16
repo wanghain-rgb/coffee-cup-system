@@ -1222,6 +1222,182 @@ textarea:disabled {
   font-size: clamp(24px, 4vw, 34px);
 }
 
+.invoice-form {
+  gap: 18px;
+}
+
+.invoice-line-list {
+  display: grid;
+  gap: 12px;
+}
+
+.invoice-line-entry {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.2fr) minmax(90px, 0.55fr) minmax(180px, 1.4fr) minmax(92px, 0.55fr) minmax(72px, 0.45fr) minmax(90px, 0.55fr) minmax(130px, 0.75fr) minmax(120px, 0.75fr);
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid rgba(8, 47, 37, 0.1);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.invoice-live-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(216, 168, 77, 0.12);
+}
+
+.invoice-live-total span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.invoice-live-total strong {
+  color: var(--green-950);
+  font-size: 26px;
+}
+
+.invoice-page {
+  margin: 0 auto;
+}
+
+.invoice-document {
+  padding: clamp(24px, 4vw, 46px);
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid rgba(8, 47, 37, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 16px 44px rgba(7, 31, 24, 0.12);
+}
+
+.invoice-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.8fr);
+  gap: 28px;
+  align-items: start;
+  padding-bottom: 24px;
+  border-bottom: 2px solid var(--gold);
+}
+
+.invoice-logo {
+  width: 170px;
+  max-height: 92px;
+  object-fit: contain;
+}
+
+.invoice-header h1 {
+  margin: 18px 0 0;
+  color: var(--green-950);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(38px, 5vw, 58px);
+}
+
+.invoice-company {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.invoice-company strong {
+  color: var(--green-950);
+  font-size: 19px;
+}
+
+.invoice-meta,
+.invoice-addresses,
+.invoice-table,
+.invoice-totals,
+.invoice-payment {
+  margin-top: 24px;
+}
+
+.invoice-meta dl {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+  border: 1px solid rgba(8, 47, 37, 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.invoice-meta dl div {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border-right: 1px solid rgba(8, 47, 37, 0.1);
+}
+
+.invoice-meta dt {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.invoice-meta dd {
+  color: var(--green-950);
+  font-weight: 900;
+}
+
+.invoice-addresses {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.invoice-addresses div,
+.invoice-payment {
+  padding: 18px;
+  border: 1px solid rgba(8, 47, 37, 0.12);
+  border-radius: 8px;
+  background: #fffdf8;
+}
+
+.invoice-addresses h2,
+.invoice-payment h2 {
+  margin: 0 0 10px;
+  color: var(--green-950);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.invoice-addresses p,
+.invoice-payment p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.invoice-totals {
+  width: min(100%, 420px);
+  display: grid;
+  gap: 0;
+  margin-left: auto;
+  border: 1px solid rgba(8, 47, 37, 0.12);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.invoice-totals div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(8, 47, 37, 0.1);
+}
+
+.invoice-totals .balance {
+  color: var(--green-950);
+  background: #fff4d9;
+  font-size: 18px;
+  font-weight: 900;
+}
+
 .panel {
   padding: 22px;
   margin: 18px 0;
@@ -1571,12 +1747,24 @@ footer {
 
   .quotation-header,
   .quotation-header dl div,
-  .quotation-customer dl div {
+  .quotation-customer dl div,
+  .invoice-header,
+  .invoice-meta dl,
+  .invoice-addresses,
+  .invoice-line-entry {
     grid-template-columns: 1fr;
   }
 
   .quotation-document {
     padding: 18px;
+  }
+
+  .invoice-document {
+    padding: 18px;
+  }
+
+  .invoice-totals {
+    width: 100%;
   }
 
   .quotation-table table {
@@ -1597,13 +1785,15 @@ footer {
   }
 
   main,
-  .quotation-page {
+  .quotation-page,
+  .invoice-page {
     width: 100%;
     margin: 0;
     padding: 0;
   }
 
-  .quotation-document {
+  .quotation-document,
+  .invoice-document {
     padding: 0;
     border: 0;
     box-shadow: none;
@@ -1620,6 +1810,14 @@ footer {
 
   .quotation-table {
     overflow: visible;
+  }
+
+  .invoice-header {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .invoice-logo {
+    width: 150px;
   }
 
   .quotation-table table,

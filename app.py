@@ -1,7 +1,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from http.cookies import SimpleCookie
-from datetime import date
+from datetime import date, timedelta
 from email.message import EmailMessage
 import html
 import hmac
@@ -123,6 +123,12 @@ def esc(value):
     return html.escape("" if value is None else str(value))
 
 
+def ensure_column(conn, table, column, ddl):
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    if column not in existing:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {ddl}")
+
+
 def init_db():
     with db() as conn:
         conn.executescript(
@@ -199,6 +205,69 @@ def init_db():
                 cost REAL NOT NULL,
                 gross_profit REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS company_master (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                company_name TEXT NOT NULL DEFAULT 'AUREA Packaging Supply Pty Ltd',
+                abn TEXT,
+                address TEXT,
+                phone TEXT,
+                email TEXT,
+                website TEXT,
+                bank_name TEXT,
+                account_name TEXT,
+                bsb TEXT,
+                account_number TEXT,
+                payment_instructions TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS invoices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_number TEXT UNIQUE NOT NULL,
+                customer_id INTEGER NOT NULL REFERENCES customers(id),
+                issue_date TEXT NOT NULL,
+                due_date TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'Draft',
+                subtotal_ex_gst REAL NOT NULL DEFAULT 0,
+                gst_amount REAL NOT NULL DEFAULT 0,
+                total_inc_gst REAL NOT NULL DEFAULT 0,
+                total_paid REAL NOT NULL DEFAULT 0,
+                balance_due REAL NOT NULL DEFAULT 0,
+                notes TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS invoice_lines (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+                product_id INTEGER REFERENCES products(id),
+                product_code TEXT,
+                description TEXT NOT NULL,
+                size TEXT,
+                product_type TEXT,
+                carton_quantity INTEGER,
+                quantity REAL NOT NULL DEFAULT 0,
+                unit_price_ex_gst REAL NOT NULL DEFAULT 0,
+                tax_type TEXT NOT NULL DEFAULT 'GST',
+                subtotal_ex_gst REAL NOT NULL DEFAULT 0,
+                gst_amount REAL NOT NULL DEFAULT 0,
+                total_inc_gst REAL NOT NULL DEFAULT 0
+            );
+            """
+        )
+        ensure_column(conn, "customers", "abn", "abn TEXT")
+        ensure_column(conn, "customers", "billing_address", "billing_address TEXT")
+        ensure_column(conn, "customers", "shipping_address", "shipping_address TEXT")
+        ensure_column(conn, "products", "product_type", "product_type TEXT")
+        ensure_column(conn, "products", "tax_type", "tax_type TEXT NOT NULL DEFAULT 'GST'")
+
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO company_master
+            (id, company_name, phone, email, website, address, payment_instructions)
+            VALUES (1, 'AUREA Packaging Supply Pty Ltd', '0497278099',
+                    'info@aureapackaging.com.au', 'https://aureapackaging.com.au',
+                    'Melbourne, Australia', 'Payment terms: To be confirmed.')
             """
         )
 
@@ -253,6 +322,8 @@ def layout(title, body, authed=False, noindex=False):
         <a href="/admin">Dashboard</a>
         <a href="/admin/products">Products</a>
         <a href="/admin/customers">Customers</a>
+        <a href="/admin/company">Company</a>
+        <a href="/admin/invoices">Invoices</a>
         <a href="/admin/purchases">Purchases</a>
         <a href="/admin/inventory">Inventory</a>
         <a href="/admin/sales">Sales</a>
@@ -337,6 +408,57 @@ def product_options(conn):
 def customer_options(conn):
     rows = conn.execute("SELECT id, business_name FROM customers ORDER BY business_name").fetchall()
     return "".join(f'<option value="{r["id"]}">{esc(r["business_name"])}</option>' for r in rows)
+
+
+def invoice_product_options(conn):
+    rows = conn.execute(
+        """
+        SELECT id, sku, name, size, qty_per_carton, sell_price, product_type, tax_type
+        FROM products
+        WHERE active = 1
+        ORDER BY sku
+        """
+    ).fetchall()
+    opts = ['<option value="">Select product</option>']
+    for r in rows:
+        description = f"{r['name']} {r['size']}".strip()
+        opts.append(
+            f'<option value="{esc(r["id"])}" '
+            f'data-code="{esc(r["sku"])}" '
+            f'data-description="{esc(description)}" '
+            f'data-size="{esc(r["size"])}" '
+            f'data-type="{esc(r["product_type"] or "")}" '
+            f'data-carton="{esc(r["qty_per_carton"])}" '
+            f'data-price="{esc(r["sell_price"])}" '
+            f'data-tax="{esc(r["tax_type"] or "GST")}">'
+            f'{esc(r["sku"])} - {esc(description)}</option>'
+        )
+    return "".join(opts)
+
+
+def next_invoice_number(conn, issue_date):
+    prefix = f"INV-{issue_date.replace('-', '')}-"
+    row = conn.execute(
+        "SELECT invoice_number FROM invoices WHERE invoice_number LIKE ? ORDER BY invoice_number DESC LIMIT 1",
+        (f"{prefix}%",),
+    ).fetchone()
+    next_number = 1
+    if row:
+        try:
+            next_number = int(row["invoice_number"].rsplit("-", 1)[1]) + 1
+        except (IndexError, ValueError):
+            next_number = 1
+    return f"{prefix}{next_number:04d}"
+
+
+def company_master(conn):
+    row = conn.execute("SELECT * FROM company_master WHERE id = 1").fetchone()
+    if row:
+        return row
+    conn.execute(
+        "INSERT INTO company_master (id, company_name) VALUES (1, 'AUREA Packaging Supply Pty Ltd')"
+    )
+    return conn.execute("SELECT * FROM company_master WHERE id = 1").fetchone()
 
 
 def product_by_id():
@@ -778,6 +900,8 @@ class App(BaseHTTPRequestHandler):
         path = parsed.path
         if path.startswith("/static/"):
             return self.static_file(path)
+        if path.startswith("/admin/invoices/"):
+            return self.admin_invoice_print(path.rsplit("/", 1)[-1])
         routes = {
             "/": self.catalogue,
             "/quote": self.quote,
@@ -788,6 +912,8 @@ class App(BaseHTTPRequestHandler):
             "/admin": self.admin,
             "/admin/products": self.admin_products,
             "/admin/customers": self.admin_customers,
+            "/admin/company": self.admin_company,
+            "/admin/invoices": self.admin_invoices,
             "/admin/purchases": self.admin_purchases,
             "/admin/inventory": self.admin_inventory,
             "/admin/sales": self.admin_sales,
@@ -1176,15 +1302,17 @@ Sitemap: {SITE_URL}/sitemap.xml
             with db() as conn:
                 conn.execute(
                     """
-                    INSERT INTO products (sku, name, size, qty_per_carton, sell_price, active)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                    INSERT INTO products (sku, name, size, product_type, qty_per_carton, sell_price, tax_type, active)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         f.get("sku"),
                         f.get("name"),
                         f.get("size"),
+                        f.get("product_type"),
                         int(f.get("qty_per_carton") or 0),
                         float(f.get("sell_price") or 0),
+                        f.get("tax_type") or "GST",
                         1 if f.get("active") == "on" else 0,
                     ),
                 )
@@ -1192,20 +1320,31 @@ Sitemap: {SITE_URL}/sitemap.xml
         with db() as conn:
             rows = conn.execute("SELECT * FROM products ORDER BY sku").fetchall()
         product_rows = [
-            [esc(r["sku"]), esc(r["name"]), esc(r["size"]), esc(r["qty_per_carton"]), money(r["sell_price"]), "Yes" if r["active"] else "No"]
+            [
+                esc(r["sku"]),
+                esc(r["name"]),
+                esc(r["size"]),
+                esc(r["product_type"] or ""),
+                esc(r["qty_per_carton"]),
+                money(r["sell_price"]),
+                esc(r["tax_type"] or "GST"),
+                "Yes" if r["active"] else "No",
+            ]
             for r in rows
         ]
         body = f"""
         <section class="section-head"><h1>Product Master</h1><p>Maintain cup and lid SKUs, carton sizes and default sell prices.</p></section>
-        {table(["SKU", "Name", "Size", "Qty/carton", "Sell price", "Active"], product_rows)}
+        {table(["Code", "Name", "Size", "Type", "Carton qty", "Unit price ex GST", "Tax", "Active"], product_rows)}
         <section class="panel">
           <h2>Add product</h2>
           <form method="post" class="form grid-form">
-            <label>SKU<input name="sku" required></label>
+            <label>Product code<input name="sku" required></label>
             <label>Name<input name="name" required></label>
             <label>Size<input name="size" required></label>
-            <label>Qty per carton<input name="qty_per_carton" type="number" required></label>
-            <label>Sell price<input name="sell_price" type="number" step="0.01" required></label>
+            <label>Product type<input name="product_type" placeholder="Coffee cups, lids, bags"></label>
+            <label>Carton quantity<input name="qty_per_carton" type="number" required></label>
+            <label>Default unit price ex GST<input name="sell_price" type="number" step="0.01" required></label>
+            <label>Tax type<select name="tax_type"><option value="GST">GST</option><option value="GST Free">GST Free</option></select></label>
             <label class="check"><input name="active" type="checkbox" checked> Active</label>
             <button class="button primary" type="submit">Add product</button>
           </form>
@@ -1219,37 +1358,417 @@ Sitemap: {SITE_URL}/sitemap.xml
         if self.command == "POST":
             f = self.form()
             with db() as conn:
-                conn.execute(
-                    """
-                    INSERT INTO customers (business_name, contact_name, email, phone, suburb, notes)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (f.get("business_name"), f.get("contact_name"), f.get("email"), f.get("phone"), f.get("suburb"), f.get("notes")),
+                customer_id = f.get("customer_id")
+                values = (
+                    f.get("business_name"),
+                    f.get("abn"),
+                    f.get("contact_name"),
+                    f.get("email"),
+                    f.get("phone"),
+                    f.get("suburb"),
+                    f.get("billing_address"),
+                    f.get("shipping_address"),
+                    f.get("notes"),
                 )
+                if customer_id:
+                    conn.execute(
+                        """
+                        UPDATE customers
+                        SET business_name = ?, abn = ?, contact_name = ?, email = ?, phone = ?,
+                            suburb = ?, billing_address = ?, shipping_address = ?, notes = ?
+                        WHERE id = ?
+                        """,
+                        (*values, int(customer_id)),
+                    )
+                else:
+                    conn.execute(
+                        """
+                        INSERT INTO customers
+                        (business_name, abn, contact_name, email, phone, suburb, billing_address, shipping_address, notes)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        values,
+                    )
             return self.redirect("/admin/customers")
+        edit_id = parse_qs(urlparse(self.path).query).get("edit", [""])[0]
         with db() as conn:
             rows = conn.execute("SELECT * FROM customers ORDER BY business_name").fetchall()
+            edit_customer = None
+            if edit_id:
+                edit_customer = conn.execute("SELECT * FROM customers WHERE id = ?", (edit_id,)).fetchone()
         customer_rows = [
-            [esc(r["business_name"]), esc(r["contact_name"]), esc(r["email"]), esc(r["phone"]), esc(r["suburb"]), esc(r["notes"])]
+            [
+                esc(r["business_name"]),
+                esc(r["abn"] or ""),
+                esc(r["contact_name"] or ""),
+                esc(r["email"] or ""),
+                esc(r["phone"] or ""),
+                esc(r["billing_address"] or r["suburb"] or ""),
+                f'<a class="mini-quote" href="/admin/customers?edit={esc(r["id"])}">Edit</a>',
+            ]
             for r in rows
         ]
+        c = edit_customer
+        form_title = "Edit customer" if c else "Add customer"
+        hidden_id = f'<input type="hidden" name="customer_id" value="{esc(c["id"])}">' if c else ""
         body = f"""
         <section class="section-head"><h1>Customer Master</h1><p>Cafe and takeaway customer records.</p></section>
-        {table(["Business", "Contact", "Email", "Phone", "Suburb", "Notes"], customer_rows)}
+        {table(["Business", "ABN", "Contact", "Email", "Phone", "Billing address", "Action"], customer_rows)}
         <section class="panel">
-          <h2>Add customer</h2>
+          <h2>{form_title}</h2>
           <form method="post" class="form grid-form">
-            <label>Business name<input name="business_name" required></label>
-            <label>Contact name<input name="contact_name"></label>
-            <label>Email<input name="email" type="email"></label>
-            <label>Phone<input name="phone"></label>
-            <label>Suburb<input name="suburb"></label>
-            <label>Notes<textarea name="notes" rows="3"></textarea></label>
-            <button class="button primary" type="submit">Add customer</button>
+            {hidden_id}
+            <label>Business name<input name="business_name" required value="{esc(c["business_name"] if c else "")}"></label>
+            <label>ABN<input name="abn" value="{esc(c["abn"] if c else "")}"></label>
+            <label>Contact person<input name="contact_name" value="{esc(c["contact_name"] if c else "")}"></label>
+            <label>Email<input name="email" type="email" value="{esc(c["email"] if c else "")}"></label>
+            <label>Phone<input name="phone" value="{esc(c["phone"] if c else "")}"></label>
+            <label>Suburb<input name="suburb" value="{esc(c["suburb"] if c else "")}"></label>
+            <label>Billing address<textarea name="billing_address" rows="3">{esc(c["billing_address"] if c else "")}</textarea></label>
+            <label>Shipping address<textarea name="shipping_address" rows="3">{esc(c["shipping_address"] if c else "")}</textarea></label>
+            <label>Notes<textarea name="notes" rows="3">{esc(c["notes"] if c else "")}</textarea></label>
+            <button class="button primary" type="submit">{form_title}</button>
           </form>
         </section>
         """
         self.respond(layout("Customer Master", body, True, noindex=True))
+
+    def admin_company(self):
+        if not self.require_admin():
+            return
+        if self.command == "POST":
+            f = self.form()
+            with db() as conn:
+                conn.execute(
+                    """
+                    UPDATE company_master
+                    SET company_name = ?, abn = ?, address = ?, phone = ?, email = ?, website = ?,
+                        bank_name = ?, account_name = ?, bsb = ?, account_number = ?, payment_instructions = ?
+                    WHERE id = 1
+                    """,
+                    (
+                        f.get("company_name"),
+                        f.get("abn"),
+                        f.get("address"),
+                        f.get("phone"),
+                        f.get("email"),
+                        f.get("website"),
+                        f.get("bank_name"),
+                        f.get("account_name"),
+                        f.get("bsb"),
+                        f.get("account_number"),
+                        f.get("payment_instructions"),
+                    ),
+                )
+            return self.redirect("/admin/company")
+        with db() as conn:
+            c = company_master(conn)
+        body = f"""
+        <section class="section-head"><h1>Company Master</h1><p>Company and payment details used on printable invoices.</p></section>
+        <section class="panel">
+          <form method="post" class="form grid-form">
+            <label>Company name<input name="company_name" required value="{esc(c["company_name"])}"></label>
+            <label>ABN<input name="abn" value="{esc(c["abn"])}"></label>
+            <label>Phone<input name="phone" value="{esc(c["phone"])}"></label>
+            <label>Email<input name="email" type="email" value="{esc(c["email"])}"></label>
+            <label>Website<input name="website" value="{esc(c["website"])}"></label>
+            <label>Bank name<input name="bank_name" value="{esc(c["bank_name"])}"></label>
+            <label>Account name<input name="account_name" value="{esc(c["account_name"])}"></label>
+            <label>BSB<input name="bsb" value="{esc(c["bsb"])}"></label>
+            <label>Account number<input name="account_number" value="{esc(c["account_number"])}"></label>
+            <label>Address<textarea name="address" rows="3">{esc(c["address"])}</textarea></label>
+            <label>Payment instructions<textarea name="payment_instructions" rows="4">{esc(c["payment_instructions"])}</textarea></label>
+            <button class="button primary" type="submit">Save company details</button>
+          </form>
+        </section>
+        """
+        self.respond(layout("Company Master", body, True, noindex=True))
+
+    def admin_invoices(self):
+        if not self.require_admin():
+            return
+        if self.command == "POST":
+            f = self.form()
+            issue_date = f.get("issue_date") or date.today().isoformat()
+            due_date = f.get("due_date") or (date.fromisoformat(issue_date) + timedelta(days=7)).isoformat()
+            selected_lines = []
+            subtotal_total = 0.0
+            gst_total = 0.0
+            with db() as conn:
+                for i in range(1, 6):
+                    product_id = f.get(f"line_product_{i}")
+                    qty = float(f.get(f"line_qty_{i}") or 0)
+                    unit_price = float(f.get(f"line_price_{i}") or 0)
+                    if not product_id or qty <= 0:
+                        continue
+                    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+                    if not product:
+                        continue
+                    tax_type = product["tax_type"] or "GST"
+                    line_subtotal = qty * unit_price
+                    line_gst = line_subtotal * 0.10 if tax_type == "GST" else 0.0
+                    selected_lines.append(
+                        {
+                            "product_id": int(product_id),
+                            "product_code": product["sku"],
+                            "description": f"{product['name']} {product['size']}".strip(),
+                            "size": product["size"],
+                            "product_type": product["product_type"] or "",
+                            "carton_quantity": product["qty_per_carton"],
+                            "quantity": qty,
+                            "unit_price_ex_gst": unit_price,
+                            "tax_type": tax_type,
+                            "subtotal_ex_gst": line_subtotal,
+                            "gst_amount": line_gst,
+                            "total_inc_gst": line_subtotal + line_gst,
+                        }
+                    )
+                    subtotal_total += line_subtotal
+                    gst_total += line_gst
+                if not selected_lines:
+                    return self.redirect("/admin/invoices")
+                total_inc_gst = subtotal_total + gst_total
+                total_paid = float(f.get("total_paid") or 0)
+                invoice_number = next_invoice_number(conn, issue_date)
+                cur = conn.execute(
+                    """
+                    INSERT INTO invoices
+                    (invoice_number, customer_id, issue_date, due_date, status, subtotal_ex_gst,
+                     gst_amount, total_inc_gst, total_paid, balance_due, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        invoice_number,
+                        int(f.get("customer_id")),
+                        issue_date,
+                        due_date,
+                        f.get("status") or "Draft",
+                        subtotal_total,
+                        gst_total,
+                        total_inc_gst,
+                        total_paid,
+                        total_inc_gst - total_paid,
+                        f.get("notes"),
+                    ),
+                )
+                invoice_id = cur.lastrowid
+                for line in selected_lines:
+                    conn.execute(
+                        """
+                        INSERT INTO invoice_lines
+                        (invoice_id, product_id, product_code, description, size, product_type,
+                         carton_quantity, quantity, unit_price_ex_gst, tax_type, subtotal_ex_gst,
+                         gst_amount, total_inc_gst)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            invoice_id,
+                            line["product_id"],
+                            line["product_code"],
+                            line["description"],
+                            line["size"],
+                            line["product_type"],
+                            line["carton_quantity"],
+                            line["quantity"],
+                            line["unit_price_ex_gst"],
+                            line["tax_type"],
+                            line["subtotal_ex_gst"],
+                            line["gst_amount"],
+                            line["total_inc_gst"],
+                        ),
+                    )
+            return self.redirect(f"/admin/invoices/{invoice_id}")
+
+        today = date.today()
+        due = today + timedelta(days=7)
+        with db() as conn:
+            customer_opts = customer_options(conn)
+            product_opts = invoice_product_options(conn)
+            rows = conn.execute(
+                """
+                SELECT i.id, i.invoice_number, i.issue_date, i.due_date, i.total_inc_gst,
+                       i.balance_due, i.status, c.business_name
+                FROM invoices i
+                JOIN customers c ON c.id = i.customer_id
+                ORDER BY i.issue_date DESC, i.id DESC
+                """
+            ).fetchall()
+        invoice_rows = [
+            [
+                esc(r["invoice_number"]),
+                esc(r["business_name"]),
+                esc(r["issue_date"]),
+                esc(r["due_date"]),
+                money(r["total_inc_gst"]),
+                money(r["balance_due"]),
+                esc(r["status"]),
+                f'<a class="mini-quote" href="/admin/invoices/{esc(r["id"])}">View / Print</a>',
+            ]
+            for r in rows
+        ]
+        line_rows = ""
+        for i in range(1, 6):
+            line_rows += f"""
+            <div class="invoice-line-entry">
+              <label>Product<select name="line_product_{i}" data-invoice-product>{product_opts}</select></label>
+              <label>Code<input name="line_code_{i}" data-line-code readonly></label>
+              <label>Description<input name="line_description_{i}" data-line-description readonly></label>
+              <label>Carton qty<input name="line_carton_{i}" data-line-carton readonly></label>
+              <label>Tax<input name="line_tax_{i}" data-line-tax readonly></label>
+              <label>Quantity<input name="line_qty_{i}" type="number" min="0" step="1" data-line-qty></label>
+              <label>Unit price ex GST<input name="line_price_{i}" type="number" min="0" step="0.01" data-line-price></label>
+              <label>Total inc GST<input data-line-total readonly></label>
+            </div>
+            """
+        body = f"""
+        <section class="section-head"><h1>Invoices</h1><p>Create invoices from customer and product master data.</p></section>
+        {table(["Invoice", "Customer", "Issue date", "Due date", "Total", "Balance", "Status", "Action"], invoice_rows)}
+        <section class="panel">
+          <h2>Create invoice</h2>
+          <form method="post" class="form invoice-form">
+            <div class="quote-detail-grid">
+              <label>Customer<select name="customer_id" required>{customer_opts}</select></label>
+              <label>Issue date<input name="issue_date" type="date" value="{today.isoformat()}" required></label>
+              <label>Due date<input name="due_date" type="date" value="{due.isoformat()}" required></label>
+              <label>Status<select name="status"><option>Draft</option><option>Sent</option><option>Paid</option></select></label>
+              <label>Total paid<input name="total_paid" type="number" min="0" step="0.01" value="0"></label>
+            </div>
+            <div class="invoice-line-list">{line_rows}</div>
+            <div class="invoice-live-total"><span>Estimated total including GST</span><strong data-invoice-total>$0.00</strong></div>
+            <label>Notes<textarea name="notes" rows="3"></textarea></label>
+            <button class="button primary" type="submit">Create Draft Invoice</button>
+          </form>
+          <script>
+            const moneyFormat = new Intl.NumberFormat("en-AU", {{ style: "currency", currency: "AUD" }});
+            const updateInvoiceTotal = () => {{
+              let total = 0;
+              document.querySelectorAll(".invoice-line-entry").forEach((row) => {{
+                const qty = Number.parseFloat(row.querySelector("[data-line-qty]").value || "0");
+                const price = Number.parseFloat(row.querySelector("[data-line-price]").value || "0");
+                const tax = row.querySelector("[data-line-tax]").value || "GST";
+                const subtotal = qty * price;
+                const lineTotal = subtotal + (tax === "GST" ? subtotal * 0.1 : 0);
+                row.querySelector("[data-line-total]").value = lineTotal ? moneyFormat.format(lineTotal) : "";
+                total += lineTotal;
+              }});
+              document.querySelector("[data-invoice-total]").textContent = moneyFormat.format(total);
+            }};
+            document.querySelectorAll("[data-invoice-product]").forEach((select) => {{
+              select.addEventListener("change", () => {{
+                const row = select.closest(".invoice-line-entry");
+                const option = select.selectedOptions[0];
+                row.querySelector("[data-line-code]").value = option.dataset.code || "";
+                row.querySelector("[data-line-description]").value = option.dataset.description || "";
+                row.querySelector("[data-line-carton]").value = option.dataset.carton || "";
+                row.querySelector("[data-line-tax]").value = option.dataset.tax || "GST";
+                row.querySelector("[data-line-price]").value = option.dataset.price || "";
+                updateInvoiceTotal();
+              }});
+            }});
+            document.querySelectorAll("[data-line-qty], [data-line-price]").forEach((input) => {{
+              input.addEventListener("input", updateInvoiceTotal);
+            }});
+          </script>
+        </section>
+        """
+        self.respond(layout("Invoices", body, True, noindex=True))
+
+    def admin_invoice_print(self, invoice_id):
+        if not self.require_admin():
+            return
+        try:
+            invoice_id = int(invoice_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        with db() as conn:
+            company = company_master(conn)
+            invoice = conn.execute(
+                """
+                SELECT i.*, c.business_name, c.abn, c.contact_name, c.email, c.phone,
+                       c.billing_address, c.shipping_address, c.suburb
+                FROM invoices i
+                JOIN customers c ON c.id = i.customer_id
+                WHERE i.id = ?
+                """,
+                (invoice_id,),
+            ).fetchone()
+            if not invoice:
+                return self.respond("Not found", 404, content_type="text/plain")
+            lines = conn.execute("SELECT * FROM invoice_lines WHERE invoice_id = ? ORDER BY id", (invoice_id,)).fetchall()
+        line_rows = "".join(
+            f"""
+            <tr>
+              <td>{esc(line["product_code"])}</td>
+              <td>{esc(line["description"])}</td>
+              <td>{esc(line["carton_quantity"])}</td>
+              <td>{esc(line["quantity"])}</td>
+              <td>{money(line["unit_price_ex_gst"])}</td>
+              <td>{esc(line["tax_type"])}</td>
+              <td>{money(line["subtotal_ex_gst"])}</td>
+              <td>{money(line["gst_amount"])}</td>
+              <td>{money(line["total_inc_gst"])}</td>
+            </tr>
+            """
+            for line in lines
+        )
+        bill_to = invoice["billing_address"] or invoice["suburb"] or ""
+        ship_to = invoice["shipping_address"] or bill_to
+        body = f"""
+        <section class="invoice-page">
+          <div class="quotation-actions no-print">
+            <button class="button primary" type="button" onclick="window.print()">Print / Save as PDF</button>
+            <a class="button ghost" href="/admin/invoices">Back to Invoices</a>
+          </div>
+          <div class="invoice-document">
+            <header class="invoice-header">
+              <div>
+                <img class="invoice-logo" src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
+                <h1>Tax Invoice</h1>
+              </div>
+              <div class="invoice-company">
+                <strong>{esc(company["company_name"])}</strong>
+                <span>ABN: {esc(company["abn"])}</span>
+                <span>{esc(company["address"])}</span>
+                <span>{esc(company["phone"])} &middot; {esc(company["email"])}</span>
+                <span>{esc(company["website"])}</span>
+              </div>
+            </header>
+            <section class="invoice-meta">
+              <dl>
+                <div><dt>Invoice number</dt><dd>{esc(invoice["invoice_number"])}</dd></div>
+                <div><dt>Issue date</dt><dd>{esc(invoice["issue_date"])}</dd></div>
+                <div><dt>Due date</dt><dd>{esc(invoice["due_date"])}</dd></div>
+                <div><dt>Status</dt><dd>{esc(invoice["status"])}</dd></div>
+              </dl>
+            </section>
+            <section class="invoice-addresses">
+              <div><h2>Bill to</h2><strong>{esc(invoice["business_name"])}</strong><p>{esc(bill_to)}</p><p>ABN: {esc(invoice["abn"])}</p><p>{esc(invoice["contact_name"])} &middot; {esc(invoice["email"])} &middot; {esc(invoice["phone"])}</p></div>
+              <div><h2>Ship to</h2><strong>{esc(invoice["business_name"])}</strong><p>{esc(ship_to)}</p></div>
+            </section>
+            <div class="quotation-table invoice-table">
+              <table>
+                <thead><tr><th>Code</th><th>Description</th><th>Carton qty</th><th>Qty</th><th>Unit ex GST</th><th>Tax</th><th>Subtotal</th><th>GST</th><th>Total</th></tr></thead>
+                <tbody>{line_rows}</tbody>
+              </table>
+            </div>
+            <section class="invoice-totals">
+              <div><span>Subtotal excluding GST</span><strong>{money(invoice["subtotal_ex_gst"])}</strong></div>
+              <div><span>GST</span><strong>{money(invoice["gst_amount"])}</strong></div>
+              <div><span>Total including GST</span><strong>{money(invoice["total_inc_gst"])}</strong></div>
+              <div><span>Total paid</span><strong>{money(invoice["total_paid"])}</strong></div>
+              <div class="balance"><span>Balance due</span><strong>{money(invoice["balance_due"])}</strong></div>
+            </section>
+            <section class="invoice-payment">
+              <h2>Payment Details</h2>
+              <p><strong>{esc(company["bank_name"])}</strong></p>
+              <p>Account name: {esc(company["account_name"])}</p>
+              <p>BSB: {esc(company["bsb"])} &middot; Account: {esc(company["account_number"])}</p>
+              <p>{esc(company["payment_instructions"])}</p>
+            </section>
+          </div>
+        </section>
+        """
+        self.respond(layout(f"Invoice {invoice['invoice_number']}", body, True, noindex=True))
 
     def admin_purchases(self):
         if not self.require_admin():
