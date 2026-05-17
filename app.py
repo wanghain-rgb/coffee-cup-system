@@ -123,6 +123,7 @@ class DbCursor:
     def __init__(self, cursor, lastrowid=None):
         self.cursor = cursor
         self.lastrowid = lastrowid if lastrowid is not None else getattr(cursor, "lastrowid", None)
+        self.rowcount = getattr(cursor, "rowcount", -1)
 
     def fetchone(self):
         return self.cursor.fetchone()
@@ -132,7 +133,7 @@ class DbCursor:
 
 
 class DbConnection:
-    RETURNING_TABLES = {"quote_requests", "purchase_batches", "sales_orders", "invoices"}
+    RETURNING_TABLES = {"quote_requests", "purchase_batches", "purchase_orders", "sales_orders", "invoices"}
 
     def __init__(self):
         self.is_postgres = bool(DATABASE_URL)
@@ -263,6 +264,24 @@ CREATE TABLE IF NOT EXISTS customers (
     notes TEXT
 );
 
+CREATE TABLE IF NOT EXISTS suppliers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_code TEXT UNIQUE NOT NULL,
+    supplier_name TEXT NOT NULL,
+    abn TEXT,
+    contact_person TEXT,
+    email TEXT,
+    phone TEXT,
+    address_line_1 TEXT,
+    address_line_2 TEXT,
+    suburb TEXT,
+    state TEXT,
+    postcode TEXT,
+    country TEXT,
+    notes TEXT,
+    active INTEGER NOT NULL DEFAULT 1
+);
+
 CREATE TABLE IF NOT EXISTS quote_requests (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     business_name TEXT NOT NULL,
@@ -294,6 +313,32 @@ CREATE TABLE IF NOT EXISTS purchase_lines (
     freight_alloc REAL NOT NULL DEFAULT 0,
     remaining_cartons INTEGER NOT NULL,
     landed_unit_cost REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS purchase_orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    supplier_id INTEGER NOT NULL REFERENCES suppliers(id),
+    order_date TEXT NOT NULL DEFAULT CURRENT_DATE,
+    status TEXT NOT NULL DEFAULT 'Draft',
+    subtotal_ex_gst REAL NOT NULL DEFAULT 0,
+    gst_amount REAL NOT NULL DEFAULT 0,
+    total_inc_gst REAL NOT NULL DEFAULT 0,
+    notes TEXT,
+    confirmed_at TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS purchase_order_lines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    product_id INTEGER NOT NULL REFERENCES products(id),
+    product_code TEXT,
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL DEFAULT 0,
+    unit_price_ex_gst REAL NOT NULL DEFAULT 0,
+    gst_amount REAL NOT NULL DEFAULT 0,
+    subtotal_ex_gst REAL NOT NULL DEFAULT 0,
+    total_inc_gst REAL NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS sales_orders (
@@ -382,6 +427,8 @@ def init_db():
         ensure_column(conn, "products", "product_type", "product_type TEXT")
         ensure_column(conn, "products", "tax_type", "tax_type TEXT NOT NULL DEFAULT 'GST'")
         ensure_column(conn, "products", "barcode", "barcode TEXT")
+        ensure_column(conn, "products", "stock_qty", "stock_qty REAL NOT NULL DEFAULT 0")
+        ensure_column(conn, "products", "avg_cost", "avg_cost REAL NOT NULL DEFAULT 0")
         ensure_column(conn, "invoices", "sales_order_id", "sales_order_id INTEGER REFERENCES sales_orders(id)")
         ensure_column(conn, "invoices", "customer_business_name", "customer_business_name TEXT")
         ensure_column(conn, "invoices", "customer_abn", "customer_abn TEXT")
@@ -461,8 +508,10 @@ def layout(title, body, authed=False, noindex=False):
         <a href="/admin">Dashboard</a>
         <a href="/admin/products">Products</a>
         <a href="/admin/customers">Customers</a>
+        <a href="/admin/suppliers">Suppliers</a>
         <a href="/admin/company">Company</a>
         <a href="/admin/invoices">Invoices</a>
+        <a href="/admin/purchase-orders">Purchase Orders</a>
         <a href="/admin/purchases">Purchases</a>
         <a href="/admin/inventory">Inventory</a>
         <a href="/admin/sales">Sales</a>
@@ -542,6 +591,17 @@ def table(headers, rows):
 def product_options(conn):
     rows = conn.execute("SELECT id, sku, name FROM products WHERE active = 1 ORDER BY sku").fetchall()
     return "".join(f'<option value="{r["id"]}">{esc(r["sku"])} - {esc(r["name"])}</option>' for r in rows)
+
+
+def supplier_options(conn, selected_id=None):
+    rows = conn.execute("SELECT id, supplier_code, supplier_name FROM suppliers WHERE active = 1 OR id = ? ORDER BY supplier_name", (selected_id or 0,)).fetchall()
+    opts = ['<option value="">Select supplier</option>']
+    for r in rows:
+        selected = "selected" if str(r["id"]) == str(selected_id or "") else ""
+        opts.append(
+            f'<option value="{esc(r["id"])}" {selected}>{esc(r["supplier_code"])} - {esc(r["supplier_name"])}</option>'
+        )
+    return "".join(opts)
 
 
 def customer_options(conn, selected_id=None):
@@ -842,6 +902,207 @@ INVOICE_FORM_SCRIPT = """
             updateInvoiceTotal();
           </script>
 """
+
+
+def po_product_options(conn, selected_id=None):
+    rows = conn.execute(
+        """
+        SELECT id, sku, name, size, sell_price, tax_type
+        FROM products
+        WHERE active = 1 OR id = ?
+        ORDER BY sku
+        """,
+        (selected_id or 0,),
+    ).fetchall()
+    opts = ['<option value="">Select product</option>']
+    for r in rows:
+        description = invoice_description(r["name"], r["size"])
+        selected = "selected" if str(r["id"]) == str(selected_id or "") else ""
+        opts.append(
+            f'<option value="{esc(r["id"])}" {selected} '
+            f'data-code="{esc(r["sku"])}" '
+            f'data-description="{esc(description)}" '
+            f'data-price="{esc(r["sell_price"])}" '
+            f'data-tax="{esc(r["tax_type"] or "GST")}">'
+            f'{esc(r["sku"])} - {esc(description)}</option>'
+        )
+    return "".join(opts)
+
+
+def po_line_form_rows(conn, existing_lines=None, max_lines=8, locked=False):
+    existing_lines = list(existing_lines or [])
+    rows = ""
+    disabled = "disabled" if locked else ""
+    for i in range(1, max_lines + 1):
+        line = existing_lines[i - 1] if i <= len(existing_lines) else None
+        product_opts = po_product_options(conn, line["product_id"] if line else None)
+        rows += f"""
+        <div class="po-line-entry">
+          <label>Product<select name="po_product_{i}" data-po-product {disabled}>{product_opts}</select></label>
+          <label>Code<input data-po-code readonly value="{esc(line["product_code"] if line else "")}"></label>
+          <label>Description<input data-po-description readonly value="{esc(line["description"] if line else "")}"></label>
+          <label>Quantity<input name="po_qty_{i}" type="number" min="0" step="1" data-po-qty value="{esc(line["quantity"] if line else "")}" {disabled}></label>
+          <label>Unit ex GST<input name="po_price_{i}" type="number" min="0" step="0.01" data-po-price value="{esc(line["unit_price_ex_gst"] if line else "")}" {disabled}></label>
+          <label>GST<input data-po-gst readonly value="{money(line["gst_amount"]) if line else ""}"></label>
+          <label>Total<input data-po-total readonly value="{money(line["total_inc_gst"]) if line else ""}"></label>
+        </div>
+        """
+    return rows
+
+
+PO_FORM_SCRIPT = """
+          <script>
+            const poMoneyFormat = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
+            const updatePoTotal = () => {
+              let total = 0;
+              document.querySelectorAll(".po-line-entry").forEach((row) => {
+                const qty = Number.parseFloat(row.querySelector("[data-po-qty]").value || "0");
+                const price = Number.parseFloat(row.querySelector("[data-po-price]").value || "0");
+                const tax = row.querySelector("[data-po-product]").selectedOptions[0]?.dataset.tax || "GST";
+                const subtotal = qty * price;
+                const gst = tax === "GST" ? subtotal * 0.1 : 0;
+                const lineTotal = subtotal + gst;
+                row.querySelector("[data-po-gst]").value = gst ? poMoneyFormat.format(gst) : "";
+                row.querySelector("[data-po-total]").value = lineTotal ? poMoneyFormat.format(lineTotal) : "";
+                total += lineTotal;
+              });
+              const totalEl = document.querySelector("[data-po-live-total]");
+              if (totalEl) totalEl.textContent = poMoneyFormat.format(total);
+            };
+            document.querySelectorAll("[data-po-product]").forEach((select) => {
+              select.addEventListener("change", () => {
+                const row = select.closest(".po-line-entry");
+                const option = select.selectedOptions[0];
+                row.querySelector("[data-po-code]").value = option.dataset.code || "";
+                row.querySelector("[data-po-description]").value = option.dataset.description || "";
+                row.querySelector("[data-po-price]").value = option.dataset.price || "";
+                updatePoTotal();
+              });
+            });
+            document.querySelectorAll("[data-po-qty], [data-po-price]").forEach((input) => {
+              input.addEventListener("input", updatePoTotal);
+            });
+            updatePoTotal();
+          </script>
+"""
+
+
+def parse_po_lines(conn, form_data, max_lines=8):
+    selected_lines = []
+    subtotal_total = 0.0
+    gst_total = 0.0
+    for i in range(1, max_lines + 1):
+        product_id = form_data.get(f"po_product_{i}")
+        qty = float(form_data.get(f"po_qty_{i}") or 0)
+        unit_price = float(form_data.get(f"po_price_{i}") or 0)
+        if not product_id or qty <= 0:
+            continue
+        product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+        if not product:
+            continue
+        tax_type = product["tax_type"] or "GST"
+        line_subtotal = qty * unit_price
+        line_gst = line_subtotal * 0.10 if tax_type == "GST" else 0.0
+        selected_lines.append(
+            {
+                "product_id": int(product_id),
+                "product_code": product["sku"],
+                "description": invoice_description(product["name"], product["size"]),
+                "quantity": qty,
+                "unit_price_ex_gst": unit_price,
+                "gst_amount": line_gst,
+                "subtotal_ex_gst": line_subtotal,
+                "total_inc_gst": line_subtotal + line_gst,
+            }
+        )
+        subtotal_total += line_subtotal
+        gst_total += line_gst
+    return selected_lines, subtotal_total, gst_total
+
+
+def insert_po_lines(conn, purchase_order_id, selected_lines):
+    for line in selected_lines:
+        conn.execute(
+            """
+            INSERT INTO purchase_order_lines
+            (purchase_order_id, product_id, product_code, description, quantity,
+             unit_price_ex_gst, gst_amount, subtotal_ex_gst, total_inc_gst)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                purchase_order_id,
+                line["product_id"],
+                line["product_code"],
+                line["description"],
+                line["quantity"],
+                line["unit_price_ex_gst"],
+                line["gst_amount"],
+                line["subtotal_ex_gst"],
+                line["total_inc_gst"],
+            ),
+        )
+
+
+def product_inventory_baseline(conn, product_id):
+    product = conn.execute("SELECT stock_qty, avg_cost FROM products WHERE id = ?", (product_id,)).fetchone()
+    stock_qty = float(product["stock_qty"] or 0) if product else 0.0
+    avg_cost = float(product["avg_cost"] or 0) if product else 0.0
+    if stock_qty <= 0:
+        row = conn.execute(
+            """
+            SELECT COALESCE(SUM(remaining_cartons),0) AS qty,
+                   COALESCE(SUM(remaining_cartons * landed_unit_cost),0) AS value
+            FROM purchase_lines
+            WHERE product_id = ?
+            """,
+            (product_id,),
+        ).fetchone()
+        stock_qty = float(row["qty"] or 0)
+        avg_cost = (float(row["value"] or 0) / stock_qty) if stock_qty else 0.0
+    return stock_qty, avg_cost
+
+
+def apply_purchase_order_to_inventory(conn, purchase_order_id):
+    po = conn.execute(
+        """
+        SELECT po.*, s.supplier_name
+        FROM purchase_orders po
+        JOIN suppliers s ON s.id = po.supplier_id
+        WHERE po.id = ?
+        """,
+        (purchase_order_id,),
+    ).fetchone()
+    if not po or po["status"] != "Draft":
+        return False
+    lines = conn.execute("SELECT * FROM purchase_order_lines WHERE purchase_order_id = ? ORDER BY id", (purchase_order_id,)).fetchall()
+    if not lines:
+        return False
+    locked = conn.execute(
+        "UPDATE purchase_orders SET status = 'Confirmed', confirmed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Draft'",
+        (purchase_order_id,),
+    )
+    if locked.rowcount != 1:
+        return False
+    batch = conn.execute(
+        "INSERT INTO purchase_batches (supplier, invoice_no, freight_cost, batch_date, notes) VALUES (?, ?, ?, ?, ?)",
+        (po["supplier_name"], f"PO-{purchase_order_id}", 0, po["order_date"], po["notes"]),
+    )
+    for line in lines:
+        current_qty, current_avg = product_inventory_baseline(conn, line["product_id"])
+        received_qty = float(line["quantity"] or 0)
+        unit_cost = float(line["unit_price_ex_gst"] or 0)
+        new_qty = current_qty + received_qty
+        new_avg = (((current_qty * current_avg) + (received_qty * unit_cost)) / new_qty) if new_qty else 0.0
+        conn.execute(
+            """
+            INSERT INTO purchase_lines
+            (batch_id, product_id, qty_cartons, unit_cost, freight_alloc, remaining_cartons, landed_unit_cost)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (batch.lastrowid, line["product_id"], int(received_qty), unit_cost, 0, int(received_qty), unit_cost),
+        )
+        conn.execute("UPDATE products SET stock_qty = ?, avg_cost = ? WHERE id = ?", (new_qty, new_avg, line["product_id"]))
+    return True
 
 
 def next_invoice_number(conn, issue_date):
@@ -1356,6 +1617,17 @@ class App(BaseHTTPRequestHandler):
             if len(parts) == 3:
                 return self.admin_sales_detail(parts[2])
             return self.respond("Not found", 404, content_type="text/plain")
+        if path.startswith("/admin/purchase-orders/"):
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[3] == "edit":
+                return self.admin_purchase_order_edit(parts[2])
+            if len(parts) == 4 and parts[3] == "confirm":
+                return self.admin_purchase_order_confirm(parts[2])
+            if len(parts) == 4 and parts[3] == "delete":
+                return self.admin_purchase_order_delete(parts[2])
+            if len(parts) == 3:
+                return self.admin_purchase_order_detail(parts[2])
+            return self.respond("Not found", 404, content_type="text/plain")
         routes = {
             "/": self.catalogue,
             "/quote": self.quote,
@@ -1366,8 +1638,10 @@ class App(BaseHTTPRequestHandler):
             "/admin": self.admin,
             "/admin/products": self.admin_products,
             "/admin/customers": self.admin_customers,
+            "/admin/suppliers": self.admin_suppliers,
             "/admin/company": self.admin_company,
             "/admin/invoices": self.admin_invoices,
+            "/admin/purchase-orders": self.admin_purchase_orders,
             "/admin/purchases": self.admin_purchases,
             "/admin/inventory": self.admin_inventory,
             "/admin/sales": self.admin_sales,
@@ -2003,6 +2277,136 @@ Sitemap: {SITE_URL}/sitemap.xml
         """
         self.respond(layout("Customer Master", body, True, noindex=True))
 
+    def admin_suppliers(self):
+        if not self.require_admin():
+            return
+        notice = ""
+        error = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "supplier":
+            notice = '<p class="notice">Supplier saved successfully.</p>'
+        elif saved == "deactivated":
+            notice = '<p class="notice">Supplier deactivated successfully. Existing purchase history is preserved.</p>'
+        if self.command == "POST":
+            f = self.form()
+            action = f.get("action") or "save"
+            supplier_id = f.get("supplier_id")
+            with db() as conn:
+                if action == "deactivate":
+                    conn.execute("UPDATE suppliers SET active = 0 WHERE id = ?", (int(supplier_id),))
+                    conn.commit()
+                    return self.redirect("/admin/suppliers?saved=deactivated")
+
+                supplier_code = (f.get("supplier_code") or "").strip()
+                supplier_name = (f.get("supplier_name") or "").strip()
+                if not supplier_code or not supplier_name:
+                    error = '<p class="alert">Please enter supplier code and supplier name.</p>'
+                else:
+                    duplicate = conn.execute(
+                        "SELECT id FROM suppliers WHERE supplier_code = ? AND (? = '' OR id != ?)",
+                        (supplier_code, supplier_id or "", int(supplier_id or 0)),
+                    ).fetchone()
+                    if duplicate:
+                        error = '<p class="alert">Supplier code already exists.</p>'
+                    else:
+                        values = (
+                            supplier_code,
+                            supplier_name,
+                            f.get("abn"),
+                            f.get("contact_person"),
+                            f.get("email"),
+                            f.get("phone"),
+                            f.get("address_line_1"),
+                            f.get("address_line_2"),
+                            f.get("suburb"),
+                            f.get("state"),
+                            f.get("postcode"),
+                            f.get("country") or "Australia",
+                            f.get("notes"),
+                            1 if f.get("active") == "on" else 0,
+                        )
+                        if supplier_id:
+                            conn.execute(
+                                """
+                                UPDATE suppliers
+                                SET supplier_code = ?, supplier_name = ?, abn = ?, contact_person = ?,
+                                    email = ?, phone = ?, address_line_1 = ?, address_line_2 = ?,
+                                    suburb = ?, state = ?, postcode = ?, country = ?, notes = ?, active = ?
+                                WHERE id = ?
+                                """,
+                                (*values, int(supplier_id)),
+                            )
+                        else:
+                            conn.execute(
+                                """
+                                INSERT INTO suppliers
+                                (supplier_code, supplier_name, abn, contact_person, email, phone,
+                                 address_line_1, address_line_2, suburb, state, postcode, country, notes, active)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                """,
+                                values,
+                            )
+                        conn.commit()
+                        return self.redirect("/admin/suppliers?saved=supplier")
+        edit_id = parse_qs(urlparse(self.path).query).get("edit", [""])[0]
+        with db() as conn:
+            rows = conn.execute("SELECT * FROM suppliers ORDER BY supplier_name").fetchall()
+            edit_supplier = conn.execute("SELECT * FROM suppliers WHERE id = ?", (edit_id,)).fetchone() if edit_id else None
+        supplier_rows = [
+            [
+                esc(r["supplier_code"]),
+                esc(r["supplier_name"]),
+                esc(r["abn"] or ""),
+                esc(r["contact_person"] or ""),
+                esc(r["email"] or ""),
+                esc(r["phone"] or ""),
+                esc(" ".join(part for part in [r["suburb"], r["state"], r["postcode"]] if part)),
+                "Yes" if r["active"] else "No",
+                (
+                    f'<a class="mini-quote" href="/admin/suppliers?edit={esc(r["id"])}">Edit</a> '
+                    f'<form method="post" class="inline-form" onsubmit="return confirm(\'Deactivate this supplier? Existing purchase history will be preserved.\')">'
+                    f'<input type="hidden" name="action" value="deactivate">'
+                    f'<input type="hidden" name="supplier_id" value="{esc(r["id"])}">'
+                    f'<button class="link-button" type="submit">Deactivate</button></form>'
+                ),
+            ]
+            for r in rows
+        ]
+        s = edit_supplier
+        form_title = "Edit supplier" if s else "Add supplier"
+        hidden_id = f'<input type="hidden" name="supplier_id" value="{esc(s["id"])}">' if s else ""
+        active_checked = "checked" if not s or s["active"] else ""
+        def supplier_value(key, default=""):
+            return esc(s[key] if s else default)
+        body = f"""
+        <section class="section-head"><h1>Supplier Master</h1><p>Maintain supplier records for purchase orders.</p></section>
+        {notice}
+        {error}
+        {table(["Code", "Supplier", "ABN", "Contact", "Email", "Phone", "Location", "Active", "Action"], supplier_rows)}
+        <section class="panel">
+          <h2>{form_title}</h2>
+          <form method="post" class="form grid-form">
+            {hidden_id}
+            <label>Supplier code<input name="supplier_code" required value="{supplier_value("supplier_code")}"></label>
+            <label>Supplier name<input name="supplier_name" required value="{supplier_value("supplier_name")}"></label>
+            <label>ABN<input name="abn" value="{supplier_value("abn")}"></label>
+            <label>Contact person<input name="contact_person" value="{supplier_value("contact_person")}"></label>
+            <label>Email<input name="email" type="email" value="{supplier_value("email")}"></label>
+            <label>Phone<input name="phone" value="{supplier_value("phone")}"></label>
+            <label>Address line 1<input name="address_line_1" value="{supplier_value("address_line_1")}"></label>
+            <label>Address line 2<input name="address_line_2" value="{supplier_value("address_line_2")}"></label>
+            <label>Suburb<input name="suburb" value="{supplier_value("suburb")}"></label>
+            <label>State<input name="state" value="{supplier_value("state")}"></label>
+            <label>Postcode<input name="postcode" value="{supplier_value("postcode")}"></label>
+            <label>Country<input name="country" value="{supplier_value("country", "Australia")}"></label>
+            <label>Notes<textarea name="notes" rows="3">{supplier_value("notes")}</textarea></label>
+            <label class="check"><input name="active" type="checkbox" {active_checked}> Active</label>
+            <button class="button primary" type="submit">{form_title}</button>
+          </form>
+        </section>
+        """
+        self.respond(layout("Supplier Master", body, True, noindex=True))
+
     def admin_company(self):
         if not self.require_admin():
             return
@@ -2402,8 +2806,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               <div class="invoice-totals">
                 <div><span>Subtotal excluding GST</span><strong>{money(invoice["subtotal_ex_gst"])}</strong></div>
                 <div><span>GST</span><strong>{money(invoice["gst_amount"])}</strong></div>
-                <div><span>Total including GST</span><strong>{money(invoice["total_inc_gst"])}</strong></div>
-                <div class="balance"><span>Balance</span><strong>{money(invoice["balance_due"])}</strong></div>
+                <div class="total"><span>Total</span><strong>{money(invoice["total_inc_gst"])}</strong></div>
               </div>
             </section>
             <section class="invoice-payment">
@@ -2423,6 +2826,286 @@ Sitemap: {SITE_URL}/sitemap.xml
         </section>
         """
         self.respond(layout(f"Invoice {invoice['invoice_number']}", body, True, noindex=True))
+
+    def admin_purchase_orders(self):
+        if not self.require_admin():
+            return
+        notice = ""
+        error = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "created":
+            notice = '<p class="notice">Purchase order created successfully.</p>'
+        elif saved == "updated":
+            notice = '<p class="notice">Purchase order updated successfully.</p>'
+        elif saved == "deleted":
+            notice = '<p class="notice">Draft purchase order deleted successfully.</p>'
+        elif saved == "confirmed":
+            notice = '<p class="notice">Purchase order confirmed and inventory updated.</p>'
+        elif saved == "locked":
+            error = '<p class="alert">Confirmed purchase orders are locked and cannot be edited or deleted.</p>'
+        if self.command == "POST":
+            f = self.form()
+            with db() as conn:
+                selected_lines, subtotal_total, gst_total = parse_po_lines(conn, f)
+                if not selected_lines:
+                    error = '<p class="alert">Please add at least one purchase order line.</p>'
+                elif not f.get("supplier_id"):
+                    error = '<p class="alert">Please select a supplier.</p>'
+                else:
+                    total_inc_gst = subtotal_total + gst_total
+                    cur = conn.execute(
+                        """
+                        INSERT INTO purchase_orders
+                        (supplier_id, order_date, status, subtotal_ex_gst, gst_amount, total_inc_gst, notes)
+                        VALUES (?, ?, 'Draft', ?, ?, ?, ?)
+                        """,
+                        (
+                            int(f.get("supplier_id")),
+                            f.get("order_date") or date.today().isoformat(),
+                            subtotal_total,
+                            gst_total,
+                            total_inc_gst,
+                            f.get("notes"),
+                        ),
+                    )
+                    po_id = cur.lastrowid
+                    insert_po_lines(conn, po_id, selected_lines)
+                    conn.commit()
+                    return self.redirect(f"/admin/purchase-orders/{po_id}?saved=created")
+        today = date.today().isoformat()
+        with db() as conn:
+            supplier_opts = supplier_options(conn)
+            line_rows = po_line_form_rows(conn, max_lines=8)
+            rows = conn.execute(
+                """
+                SELECT po.*, s.supplier_name
+                FROM purchase_orders po
+                JOIN suppliers s ON s.id = po.supplier_id
+                ORDER BY po.order_date DESC, po.id DESC
+                """
+            ).fetchall()
+        po_rows = [
+            [
+                f"PO-{esc(r["id"])}",
+                esc(display_date(r["order_date"])),
+                esc(r["supplier_name"]),
+                esc(r["status"]),
+                money(r["subtotal_ex_gst"]),
+                money(r["gst_amount"]),
+                money(r["total_inc_gst"]),
+                (
+                    f'<div class="action-group">'
+                    f'<a class="mini-quote" href="/admin/purchase-orders/{esc(r["id"])}">View</a>'
+                    f'<a class="mini-quote" href="/admin/purchase-orders/{esc(r["id"])}/edit">Edit</a>'
+                    f'</div>'
+                ),
+            ]
+            for r in rows
+        ]
+        body = f"""
+        <section class="section-head"><h1>Purchase Orders</h1><p>Create draft purchase orders and confirm them into inventory.</p></section>
+        {notice}
+        {error}
+        {table(["PO", "Date", "Supplier", "Status", "Subtotal", "GST", "Total", "Action"], po_rows)}
+        <section class="panel">
+          <h2>Create purchase order</h2>
+          <form method="post" class="form invoice-form">
+            <div class="quote-detail-grid">
+              <label>Supplier<select name="supplier_id" required>{supplier_opts}</select></label>
+              <label>Order date<input name="order_date" type="date" value="{today}" required></label>
+            </div>
+            <div class="po-line-list">{line_rows}</div>
+            <div class="invoice-live-total"><span>Estimated total including GST</span><strong data-po-live-total>$0.00</strong></div>
+            <label>Notes<textarea name="notes" rows="3"></textarea></label>
+            <button class="button primary" type="submit">Create Purchase Order</button>
+          </form>
+          {PO_FORM_SCRIPT}
+        </section>
+        """
+        self.respond(layout("Purchase Orders", body, True, noindex=True))
+
+    def admin_purchase_order_detail(self, po_id):
+        if not self.require_admin():
+            return
+        try:
+            po_id = int(po_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        notice = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "created":
+            notice = '<p class="notice">Purchase order created successfully.</p>'
+        elif saved == "updated":
+            notice = '<p class="notice">Purchase order updated successfully.</p>'
+        elif saved == "confirmed":
+            notice = '<p class="notice">Purchase order confirmed and inventory updated.</p>'
+        with db() as conn:
+            po = conn.execute(
+                """
+                SELECT po.*, s.supplier_name, s.supplier_code
+                FROM purchase_orders po
+                JOIN suppliers s ON s.id = po.supplier_id
+                WHERE po.id = ?
+                """,
+                (po_id,),
+            ).fetchone()
+            if not po:
+                return self.respond("Not found", 404, content_type="text/plain")
+            lines = conn.execute("SELECT * FROM purchase_order_lines WHERE purchase_order_id = ? ORDER BY id", (po_id,)).fetchall()
+        line_rows = [
+            [
+                esc(r["product_code"]),
+                esc(r["description"]),
+                esc(r["quantity"]),
+                money(r["unit_price_ex_gst"]),
+                money(r["subtotal_ex_gst"]),
+                money(r["gst_amount"]),
+                money(r["total_inc_gst"]),
+            ]
+            for r in lines
+        ]
+        if po["status"] == "Draft":
+            actions = f"""
+            <div class="form-actions">
+              <form method="post" action="/admin/purchase-orders/{po_id}/confirm" onsubmit="return confirm('Confirm this purchase order and update inventory? This can only be done once.')">
+                <button class="button primary" type="submit">Confirm PO</button>
+              </form>
+              <a class="button secondary" href="/admin/purchase-orders/{po_id}/edit">Edit</a>
+              <form method="post" action="/admin/purchase-orders/{po_id}/delete" onsubmit="return confirm('Delete this draft purchase order?')">
+                <button class="link-button" type="submit">Delete</button>
+              </form>
+            </div>
+            """
+        else:
+            actions = '<p class="notice">This purchase order is confirmed and locked from accidental changes.</p>'
+        body = f"""
+        <section class="section-head"><h1>Purchase Order PO-{esc(po["id"])}</h1><p>Supplier order detail and inventory confirmation.</p></section>
+        {notice}
+        <section class="panel">
+          <div class="invoice-meta">
+            <dl>
+              <div><dt>Date</dt><dd>{esc(display_date(po["order_date"]))}</dd></div>
+              <div><dt>Supplier</dt><dd>{esc(po["supplier_name"])}</dd></div>
+              <div><dt>Status</dt><dd>{esc(po["status"])}</dd></div>
+              <div><dt>Total</dt><dd>{money(po["total_inc_gst"])}</dd></div>
+            </dl>
+          </div>
+          {actions}
+        </section>
+        {table(["Code", "Description", "Qty", "Unit ex GST", "Subtotal", "GST", "Total"], line_rows)}
+        """
+        self.respond(layout(f"Purchase Order PO-{po_id}", body, True, noindex=True))
+
+    def admin_purchase_order_edit(self, po_id):
+        if not self.require_admin():
+            return
+        try:
+            po_id = int(po_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        error = ""
+        if self.command == "POST":
+            f = self.form()
+            with db() as conn:
+                po = conn.execute("SELECT * FROM purchase_orders WHERE id = ?", (po_id,)).fetchone()
+                if not po:
+                    return self.respond("Not found", 404, content_type="text/plain")
+                if po["status"] != "Draft":
+                    return self.redirect("/admin/purchase-orders?saved=locked")
+                selected_lines, subtotal_total, gst_total = parse_po_lines(conn, f)
+                if not selected_lines:
+                    error = '<p class="alert">Please add at least one purchase order line.</p>'
+                elif not f.get("supplier_id"):
+                    error = '<p class="alert">Please select a supplier.</p>'
+                else:
+                    total_inc_gst = subtotal_total + gst_total
+                    conn.execute(
+                        """
+                        UPDATE purchase_orders
+                        SET supplier_id = ?, order_date = ?, subtotal_ex_gst = ?,
+                            gst_amount = ?, total_inc_gst = ?, notes = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            int(f.get("supplier_id")),
+                            f.get("order_date") or date.today().isoformat(),
+                            subtotal_total,
+                            gst_total,
+                            total_inc_gst,
+                            f.get("notes"),
+                            po_id,
+                        ),
+                    )
+                    conn.execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = ?", (po_id,))
+                    insert_po_lines(conn, po_id, selected_lines)
+                    conn.commit()
+                    return self.redirect(f"/admin/purchase-orders/{po_id}?saved=updated")
+        with db() as conn:
+            po = conn.execute("SELECT * FROM purchase_orders WHERE id = ?", (po_id,)).fetchone()
+            if not po:
+                return self.respond("Not found", 404, content_type="text/plain")
+            if po["status"] != "Draft":
+                return self.redirect("/admin/purchase-orders?saved=locked")
+            supplier_opts = supplier_options(conn, po["supplier_id"])
+            lines = conn.execute("SELECT * FROM purchase_order_lines WHERE purchase_order_id = ? ORDER BY id", (po_id,)).fetchall()
+            line_rows = po_line_form_rows(conn, lines, max_lines=max(8, len(lines) + 2))
+        body = f"""
+        <section class="section-head"><h1>Edit Purchase Order PO-{esc(po_id)}</h1><p>Draft purchase orders can be changed before confirmation.</p></section>
+        {error}
+        <section class="panel">
+          <form method="post" class="form invoice-form">
+            <div class="quote-detail-grid">
+              <label>Supplier<select name="supplier_id" required>{supplier_opts}</select></label>
+              <label>Order date<input name="order_date" type="date" value="{esc(po["order_date"])}" required></label>
+            </div>
+            <div class="po-line-list">{line_rows}</div>
+            <div class="invoice-live-total"><span>Estimated total including GST</span><strong data-po-live-total>{money(po["total_inc_gst"])}</strong></div>
+            <label>Notes<textarea name="notes" rows="3">{esc(po["notes"])}</textarea></label>
+            <div class="form-actions">
+              <button class="button primary" type="submit">Save Purchase Order</button>
+              <a class="button secondary" href="/admin/purchase-orders/{esc(po_id)}">Cancel</a>
+            </div>
+          </form>
+          {PO_FORM_SCRIPT}
+        </section>
+        """
+        self.respond(layout(f"Edit PO-{po_id}", body, True, noindex=True))
+
+    def admin_purchase_order_confirm(self, po_id):
+        if not self.require_admin():
+            return
+        if self.command != "POST":
+            return self.redirect(f"/admin/purchase-orders/{esc(po_id)}")
+        try:
+            po_id = int(po_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        with db() as conn:
+            confirmed = apply_purchase_order_to_inventory(conn, po_id)
+            conn.commit()
+        if confirmed:
+            return self.redirect(f"/admin/purchase-orders/{po_id}?saved=confirmed")
+        return self.redirect("/admin/purchase-orders?saved=locked")
+
+    def admin_purchase_order_delete(self, po_id):
+        if not self.require_admin():
+            return
+        if self.command != "POST":
+            return self.redirect(f"/admin/purchase-orders/{esc(po_id)}")
+        try:
+            po_id = int(po_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        with db() as conn:
+            po = conn.execute("SELECT status FROM purchase_orders WHERE id = ?", (po_id,)).fetchone()
+            if not po:
+                return self.respond("Not found", 404, content_type="text/plain")
+            if po["status"] != "Draft":
+                return self.redirect("/admin/purchase-orders?saved=locked")
+            conn.execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = ?", (po_id,))
+            conn.execute("DELETE FROM purchase_orders WHERE id = ?", (po_id,))
+            conn.commit()
+        return self.redirect("/admin/purchase-orders?saved=deleted")
 
     def admin_purchases(self):
         if not self.require_admin():
@@ -2506,18 +3189,26 @@ Sitemap: {SITE_URL}/sitemap.xml
         with db() as conn:
             rows = conn.execute(
                 """
-                SELECT p.sku, p.name, COALESCE(SUM(l.remaining_cartons),0) AS cartons,
-                       COALESCE(SUM(l.remaining_cartons * l.landed_unit_cost),0) AS stock_value
+                SELECT p.sku, p.name,
+                       CASE WHEN COALESCE(p.stock_qty, 0) > 0
+                            THEN p.stock_qty
+                            ELSE COALESCE(SUM(l.remaining_cartons),0)
+                       END AS cartons,
+                       CASE WHEN COALESCE(p.stock_qty, 0) > 0
+                            THEN p.stock_qty * COALESCE(p.avg_cost, 0)
+                            ELSE COALESCE(SUM(l.remaining_cartons * l.landed_unit_cost),0)
+                       END AS stock_value,
+                       COALESCE(p.avg_cost, 0) AS avg_cost
                 FROM products p
                 LEFT JOIN purchase_lines l ON l.product_id = p.id
-                GROUP BY p.id
+                GROUP BY p.id, p.sku, p.name, p.stock_qty, p.avg_cost
                 ORDER BY p.sku
                 """
             ).fetchall()
-        inv_rows = [[esc(r["sku"]), esc(r["name"]), esc(r["cartons"]), money(r["stock_value"])] for r in rows]
+        inv_rows = [[esc(r["sku"]), esc(r["name"]), esc(r["cartons"]), money(r["avg_cost"]), money(r["stock_value"])] for r in rows]
         body = f"""
         <section class="section-head"><h1>Inventory Balance</h1><p>On-hand cartons and stock value from remaining purchase batches.</p></section>
-        {table(["SKU", "Product", "On hand cartons", "Stock value"], inv_rows)}
+        {table(["SKU", "Product", "On hand cartons", "Average cost", "Stock value"], inv_rows)}
         """
         self.respond(layout("Inventory Balance", body, True, noindex=True))
 
@@ -2546,6 +3237,10 @@ Sitemap: {SITE_URL}/sitemap.xml
                     message = '<p class="alert">Not enough stock for this sales order.</p>'
                 else:
                     cost_total = self.allocate_fifo(conn, product_id, qty)
+                    conn.execute(
+                        "UPDATE products SET stock_qty = CASE WHEN COALESCE(stock_qty, 0) > ? THEN stock_qty - ? ELSE 0 END WHERE id = ?",
+                        (qty, qty, product_id),
+                    )
                     revenue = qty * sell_price
                     cur = conn.execute(
                         "INSERT INTO sales_orders (customer_id, order_date, status, notes) VALUES (?, ?, ?, ?)",
