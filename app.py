@@ -525,25 +525,49 @@ def product_options(conn):
     return "".join(f'<option value="{r["id"]}">{esc(r["sku"])} - {esc(r["name"])}</option>' for r in rows)
 
 
-def customer_options(conn):
+def customer_options(conn, selected_id=None):
     rows = conn.execute("SELECT id, business_name FROM customers ORDER BY business_name").fetchall()
-    return "".join(f'<option value="{r["id"]}">{esc(r["business_name"])}</option>' for r in rows)
+    return "".join(
+        f'<option value="{r["id"]}" {"selected" if str(r["id"]) == str(selected_id or "") else ""}>{esc(r["business_name"])}</option>'
+        for r in rows
+    )
 
 
-def invoice_product_options(conn):
+def invoice_description(name, size):
+    name = (name or "").strip()
+    size = (size or "").strip()
+    if not size:
+        return name
+    if name.lower().endswith(size.lower()):
+        return name
+    return f"{name} {size}".strip()
+
+
+def invoice_description_display(description, size):
+    description = (description or "").strip()
+    size = (size or "").strip()
+    if size and description.lower().endswith(size.lower()) and len(description) > len(size):
+        return description[: -len(size)].strip()
+    return description
+
+
+def invoice_product_options(conn, selected_id=None):
+    selected_id = selected_id or 0
     rows = conn.execute(
         """
         SELECT id, sku, name, size, qty_per_carton, sell_price, product_type, tax_type
         FROM products
-        WHERE active = 1
+        WHERE active = 1 OR id = ?
         ORDER BY sku
-        """
+        """,
+        (selected_id,),
     ).fetchall()
     opts = ['<option value="">Select product</option>']
     for r in rows:
-        description = f"{r['name']} {r['size']}".strip()
+        description = invoice_description(r["name"], r["size"])
+        selected = "selected" if str(r["id"]) == str(selected_id) else ""
         opts.append(
-            f'<option value="{esc(r["id"])}" '
+            f'<option value="{esc(r["id"])}" {selected} '
             f'data-code="{esc(r["sku"])}" '
             f'data-description="{esc(description)}" '
             f'data-size="{esc(r["size"])}" '
@@ -554,6 +578,137 @@ def invoice_product_options(conn):
             f'{esc(r["sku"])} - {esc(description)}</option>'
         )
     return "".join(opts)
+
+
+def status_options(selected_status="Draft"):
+    statuses = ["Draft", "Sent", "Paid", "Cancelled"]
+    return "".join(
+        f'<option {"selected" if status == selected_status else ""}>{status}</option>'
+        for status in statuses
+    )
+
+
+def parse_invoice_lines(conn, form_data, max_lines=8):
+    selected_lines = []
+    subtotal_total = 0.0
+    gst_total = 0.0
+    for i in range(1, max_lines + 1):
+        product_id = form_data.get(f"line_product_{i}")
+        qty = float(form_data.get(f"line_qty_{i}") or 0)
+        unit_price = float(form_data.get(f"line_price_{i}") or 0)
+        if not product_id or qty <= 0:
+            continue
+        product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+        if not product:
+            continue
+        tax_type = product["tax_type"] or "GST"
+        line_subtotal = qty * unit_price
+        line_gst = line_subtotal * 0.10 if tax_type == "GST" else 0.0
+        selected_lines.append(
+            {
+                "product_id": int(product_id),
+                "product_code": product["sku"],
+                "description": invoice_description(product["name"], product["size"]),
+                "size": product["size"],
+                "product_type": product["product_type"] or "",
+                "carton_quantity": product["qty_per_carton"],
+                "quantity": qty,
+                "unit_price_ex_gst": unit_price,
+                "tax_type": tax_type,
+                "subtotal_ex_gst": line_subtotal,
+                "gst_amount": line_gst,
+                "total_inc_gst": line_subtotal + line_gst,
+            }
+        )
+        subtotal_total += line_subtotal
+        gst_total += line_gst
+    return selected_lines, subtotal_total, gst_total
+
+
+def insert_invoice_lines(conn, invoice_id, selected_lines):
+    for line in selected_lines:
+        conn.execute(
+            """
+            INSERT INTO invoice_lines
+            (invoice_id, product_id, product_code, description, size, product_type,
+             carton_quantity, quantity, unit_price_ex_gst, tax_type, subtotal_ex_gst,
+             gst_amount, total_inc_gst)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                invoice_id,
+                line["product_id"],
+                line["product_code"],
+                line["description"],
+                line["size"],
+                line["product_type"],
+                line["carton_quantity"],
+                line["quantity"],
+                line["unit_price_ex_gst"],
+                line["tax_type"],
+                line["subtotal_ex_gst"],
+                line["gst_amount"],
+                line["total_inc_gst"],
+            ),
+        )
+
+
+def invoice_line_form_rows(conn, existing_lines=None, max_lines=8):
+    existing_lines = list(existing_lines or [])
+    rows = ""
+    for i in range(1, max_lines + 1):
+        line = existing_lines[i - 1] if i <= len(existing_lines) else None
+        selected_product = line["product_id"] if line else None
+        product_opts = invoice_product_options(conn, selected_product)
+        rows += f"""
+        <div class="invoice-line-entry">
+          <label>Product<select name="line_product_{i}" data-invoice-product>{product_opts}</select></label>
+          <label>Code<input name="line_code_{i}" data-line-code readonly value="{esc(line["product_code"] if line else "")}"></label>
+          <label>Description<input name="line_description_{i}" data-line-description readonly value="{esc(invoice_description_display(line["description"], line["size"]) if line else "")}"></label>
+          <label>UoM<input name="line_carton_{i}" data-line-carton readonly value="{esc(line["carton_quantity"] if line else "")}"></label>
+          <label>Tax<input name="line_tax_{i}" data-line-tax readonly value="{esc(line["tax_type"] if line else "")}"></label>
+          <label>Quantity<input name="line_qty_{i}" type="number" min="0" step="1" data-line-qty value="{esc(line["quantity"] if line else "")}"></label>
+          <label>Unit price ex GST<input name="line_price_{i}" type="number" min="0" step="0.01" data-line-price value="{esc(line["unit_price_ex_gst"] if line else "")}"></label>
+          <label>Total inc GST<input data-line-total readonly value="{money(line["total_inc_gst"]) if line else ""}"></label>
+        </div>
+        """
+    return rows
+
+
+INVOICE_FORM_SCRIPT = """
+          <script>
+            const moneyFormat = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
+            const updateInvoiceTotal = () => {
+              let total = 0;
+              document.querySelectorAll(".invoice-line-entry").forEach((row) => {
+                const qty = Number.parseFloat(row.querySelector("[data-line-qty]").value || "0");
+                const price = Number.parseFloat(row.querySelector("[data-line-price]").value || "0");
+                const tax = row.querySelector("[data-line-tax]").value || "GST";
+                const subtotal = qty * price;
+                const lineTotal = subtotal + (tax === "GST" ? subtotal * 0.1 : 0);
+                row.querySelector("[data-line-total]").value = lineTotal ? moneyFormat.format(lineTotal) : "";
+                total += lineTotal;
+              });
+              document.querySelector("[data-invoice-total]").textContent = moneyFormat.format(total);
+            };
+            document.querySelectorAll("[data-invoice-product]").forEach((select) => {
+              select.addEventListener("change", () => {
+                const row = select.closest(".invoice-line-entry");
+                const option = select.selectedOptions[0];
+                row.querySelector("[data-line-code]").value = option.dataset.code || "";
+                row.querySelector("[data-line-description]").value = option.dataset.description || "";
+                row.querySelector("[data-line-carton]").value = option.dataset.carton || "";
+                row.querySelector("[data-line-tax]").value = option.dataset.tax || "GST";
+                row.querySelector("[data-line-price]").value = option.dataset.price || "";
+                updateInvoiceTotal();
+              });
+            });
+            document.querySelectorAll("[data-line-qty], [data-line-price]").forEach((input) => {
+              input.addEventListener("input", updateInvoiceTotal);
+            });
+            updateInvoiceTotal();
+          </script>
+"""
 
 
 def next_invoice_number(conn, issue_date):
@@ -1021,7 +1176,14 @@ class App(BaseHTTPRequestHandler):
         if path.startswith("/static/"):
             return self.static_file(path)
         if path.startswith("/admin/invoices/"):
-            return self.admin_invoice_print(path.rsplit("/", 1)[-1])
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[3] == "edit":
+                return self.admin_invoice_edit(parts[2])
+            if len(parts) == 4 and parts[3] == "delete":
+                return self.admin_invoice_delete(parts[2])
+            if len(parts) == 3:
+                return self.admin_invoice_print(parts[2])
+            return self.respond("Not found", 404, content_type="text/plain")
         routes = {
             "/": self.catalogue,
             "/quote": self.quote,
@@ -1742,44 +1904,18 @@ Sitemap: {SITE_URL}/sitemap.xml
     def admin_invoices(self):
         if not self.require_admin():
             return
+        notice = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "updated":
+            notice = '<p class="notice">Invoice updated successfully.</p>'
+        elif saved == "deleted":
+            notice = '<p class="notice">Invoice deleted successfully.</p>'
         if self.command == "POST":
             f = self.form()
             issue_date = f.get("issue_date") or date.today().isoformat()
             due_date = f.get("due_date") or (date.fromisoformat(issue_date) + timedelta(days=7)).isoformat()
-            selected_lines = []
-            subtotal_total = 0.0
-            gst_total = 0.0
             with db() as conn:
-                for i in range(1, 6):
-                    product_id = f.get(f"line_product_{i}")
-                    qty = float(f.get(f"line_qty_{i}") or 0)
-                    unit_price = float(f.get(f"line_price_{i}") or 0)
-                    if not product_id or qty <= 0:
-                        continue
-                    product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
-                    if not product:
-                        continue
-                    tax_type = product["tax_type"] or "GST"
-                    line_subtotal = qty * unit_price
-                    line_gst = line_subtotal * 0.10 if tax_type == "GST" else 0.0
-                    selected_lines.append(
-                        {
-                            "product_id": int(product_id),
-                            "product_code": product["sku"],
-                            "description": f"{product['name']} {product['size']}".strip(),
-                            "size": product["size"],
-                            "product_type": product["product_type"] or "",
-                            "carton_quantity": product["qty_per_carton"],
-                            "quantity": qty,
-                            "unit_price_ex_gst": unit_price,
-                            "tax_type": tax_type,
-                            "subtotal_ex_gst": line_subtotal,
-                            "gst_amount": line_gst,
-                            "total_inc_gst": line_subtotal + line_gst,
-                        }
-                    )
-                    subtotal_total += line_subtotal
-                    gst_total += line_gst
+                selected_lines, subtotal_total, gst_total = parse_invoice_lines(conn, f)
                 if not selected_lines:
                     return self.redirect("/admin/invoices")
                 total_inc_gst = subtotal_total + gst_total
@@ -1807,31 +1943,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                     ),
                 )
                 invoice_id = cur.lastrowid
-                for line in selected_lines:
-                    conn.execute(
-                        """
-                        INSERT INTO invoice_lines
-                        (invoice_id, product_id, product_code, description, size, product_type,
-                         carton_quantity, quantity, unit_price_ex_gst, tax_type, subtotal_ex_gst,
-                         gst_amount, total_inc_gst)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (
-                            invoice_id,
-                            line["product_id"],
-                            line["product_code"],
-                            line["description"],
-                            line["size"],
-                            line["product_type"],
-                            line["carton_quantity"],
-                            line["quantity"],
-                            line["unit_price_ex_gst"],
-                            line["tax_type"],
-                            line["subtotal_ex_gst"],
-                            line["gst_amount"],
-                            line["total_inc_gst"],
-                        ),
-                    )
+                insert_invoice_lines(conn, invoice_id, selected_lines)
                 conn.commit()
             return self.redirect(f"/admin/invoices/{invoice_id}")
 
@@ -1839,7 +1951,6 @@ Sitemap: {SITE_URL}/sitemap.xml
         due = today + timedelta(days=7)
         with db() as conn:
             customer_opts = customer_options(conn)
-            product_opts = invoice_product_options(conn)
             rows = conn.execute(
                 """
                 SELECT i.id, i.invoice_number, i.issue_date, i.due_date, i.total_inc_gst,
@@ -1849,6 +1960,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                 ORDER BY i.issue_date DESC, i.id DESC
                 """
             ).fetchall()
+            line_rows = invoice_line_form_rows(conn, max_lines=8)
         invoice_rows = [
             [
                 esc(r["invoice_number"]),
@@ -1858,26 +1970,20 @@ Sitemap: {SITE_URL}/sitemap.xml
                 money(r["total_inc_gst"]),
                 money(r["balance_due"]),
                 esc(r["status"]),
-                f'<a class="mini-quote" href="/admin/invoices/{esc(r["id"])}">View / Print</a>',
+                (
+                    f'<div class="action-group">'
+                    f'<a class="mini-quote" href="/admin/invoices/{esc(r["id"])}">View / Print</a>'
+                    f'<a class="mini-quote" href="/admin/invoices/{esc(r["id"])}/edit">Edit</a>'
+                    f'<form method="post" action="/admin/invoices/{esc(r["id"])}/delete" class="inline-form" onsubmit="return confirm(\'Delete invoice {esc(r["invoice_number"])}? This cannot be undone.\')">'
+                    f'<button class="link-button" type="submit">Delete</button></form>'
+                    f'</div>'
+                ),
             ]
             for r in rows
         ]
-        line_rows = ""
-        for i in range(1, 6):
-            line_rows += f"""
-            <div class="invoice-line-entry">
-              <label>Product<select name="line_product_{i}" data-invoice-product>{product_opts}</select></label>
-              <label>Code<input name="line_code_{i}" data-line-code readonly></label>
-              <label>Description<input name="line_description_{i}" data-line-description readonly></label>
-              <label>Carton qty<input name="line_carton_{i}" data-line-carton readonly></label>
-              <label>Tax<input name="line_tax_{i}" data-line-tax readonly></label>
-              <label>Quantity<input name="line_qty_{i}" type="number" min="0" step="1" data-line-qty></label>
-              <label>Unit price ex GST<input name="line_price_{i}" type="number" min="0" step="0.01" data-line-price></label>
-              <label>Total inc GST<input data-line-total readonly></label>
-            </div>
-            """
         body = f"""
         <section class="section-head"><h1>Invoices</h1><p>Create invoices from customer and product master data.</p></section>
+        {notice}
         {table(["Invoice", "Customer", "Issue date", "Due date", "Total", "Balance", "Status", "Action"], invoice_rows)}
         <section class="panel">
           <h2>Create invoice</h2>
@@ -1886,7 +1992,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               <label>Customer<select name="customer_id" required>{customer_opts}</select></label>
               <label>Issue date<input name="issue_date" type="date" value="{today.isoformat()}" required></label>
               <label>Due date<input name="due_date" type="date" value="{due.isoformat()}" required></label>
-              <label>Status<select name="status"><option>Draft</option><option>Sent</option><option>Paid</option></select></label>
+              <label>Status<select name="status">{status_options("Draft")}</select></label>
               <label>Total paid<input name="total_paid" type="number" min="0" step="0.01" value="0"></label>
             </div>
             <div class="invoice-line-list">{line_rows}</div>
@@ -1894,40 +2000,113 @@ Sitemap: {SITE_URL}/sitemap.xml
             <label>Notes<textarea name="notes" rows="3"></textarea></label>
             <button class="button primary" type="submit">Create Draft Invoice</button>
           </form>
-          <script>
-            const moneyFormat = new Intl.NumberFormat("en-AU", {{ style: "currency", currency: "AUD" }});
-            const updateInvoiceTotal = () => {{
-              let total = 0;
-              document.querySelectorAll(".invoice-line-entry").forEach((row) => {{
-                const qty = Number.parseFloat(row.querySelector("[data-line-qty]").value || "0");
-                const price = Number.parseFloat(row.querySelector("[data-line-price]").value || "0");
-                const tax = row.querySelector("[data-line-tax]").value || "GST";
-                const subtotal = qty * price;
-                const lineTotal = subtotal + (tax === "GST" ? subtotal * 0.1 : 0);
-                row.querySelector("[data-line-total]").value = lineTotal ? moneyFormat.format(lineTotal) : "";
-                total += lineTotal;
-              }});
-              document.querySelector("[data-invoice-total]").textContent = moneyFormat.format(total);
-            }};
-            document.querySelectorAll("[data-invoice-product]").forEach((select) => {{
-              select.addEventListener("change", () => {{
-                const row = select.closest(".invoice-line-entry");
-                const option = select.selectedOptions[0];
-                row.querySelector("[data-line-code]").value = option.dataset.code || "";
-                row.querySelector("[data-line-description]").value = option.dataset.description || "";
-                row.querySelector("[data-line-carton]").value = option.dataset.carton || "";
-                row.querySelector("[data-line-tax]").value = option.dataset.tax || "GST";
-                row.querySelector("[data-line-price]").value = option.dataset.price || "";
-                updateInvoiceTotal();
-              }});
-            }});
-            document.querySelectorAll("[data-line-qty], [data-line-price]").forEach((input) => {{
-              input.addEventListener("input", updateInvoiceTotal);
-            }});
-          </script>
+          {INVOICE_FORM_SCRIPT}
         </section>
         """
         self.respond(layout("Invoices", body, True, noindex=True))
+
+    def admin_invoice_edit(self, invoice_id):
+        if not self.require_admin():
+            return
+        try:
+            invoice_id = int(invoice_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        error = ""
+        if self.command == "POST":
+            f = self.form()
+            issue_date = f.get("issue_date") or date.today().isoformat()
+            due_date = f.get("due_date") or (date.fromisoformat(issue_date) + timedelta(days=7)).isoformat()
+            with db() as conn:
+                invoice = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+                if not invoice:
+                    return self.respond("Not found", 404, content_type="text/plain")
+                selected_lines, subtotal_total, gst_total = parse_invoice_lines(conn, f)
+                if not selected_lines:
+                    error = '<p class="alert">Please add at least one invoice line before saving.</p>'
+                else:
+                    total_inc_gst = subtotal_total + gst_total
+                    total_paid = float(f.get("total_paid") or 0)
+                    # Temporary testing rule:
+                    # all invoice statuses are editable/deletable.
+                    # Before formal production use,
+                    # restrict Sent/Paid invoices.
+                    conn.execute(
+                        """
+                        UPDATE invoices
+                        SET customer_id = ?, issue_date = ?, due_date = ?, status = ?,
+                            subtotal_ex_gst = ?, gst_amount = ?, total_inc_gst = ?,
+                            total_paid = ?, balance_due = ?, notes = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            int(f.get("customer_id")),
+                            issue_date,
+                            due_date,
+                            f.get("status") or "Draft",
+                            subtotal_total,
+                            gst_total,
+                            total_inc_gst,
+                            total_paid,
+                            total_inc_gst - total_paid,
+                            f.get("notes"),
+                            invoice_id,
+                        ),
+                    )
+                    conn.execute("DELETE FROM invoice_lines WHERE invoice_id = ?", (invoice_id,))
+                    insert_invoice_lines(conn, invoice_id, selected_lines)
+                    conn.commit()
+                    return self.redirect("/admin/invoices?saved=updated")
+        with db() as conn:
+            invoice = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
+            if not invoice:
+                return self.respond("Not found", 404, content_type="text/plain")
+            lines = conn.execute("SELECT * FROM invoice_lines WHERE invoice_id = ? ORDER BY id", (invoice_id,)).fetchall()
+            customer_opts = customer_options(conn, invoice["customer_id"])
+            line_rows = invoice_line_form_rows(conn, lines, max_lines=max(8, len(lines) + 2))
+        body = f"""
+        <section class="section-head"><h1>Edit Invoice</h1><p>Update invoice {esc(invoice["invoice_number"])}. The invoice number is preserved.</p></section>
+        {error}
+        <section class="panel">
+          <form method="post" class="form invoice-form">
+            <div class="quote-detail-grid">
+              <label>Customer<select name="customer_id" required>{customer_opts}</select></label>
+              <label>Issue date<input name="issue_date" type="date" value="{esc(invoice["issue_date"])}" required></label>
+              <label>Due date<input name="due_date" type="date" value="{esc(invoice["due_date"])}" required></label>
+              <label>Status<select name="status">{status_options(invoice["status"])}</select></label>
+              <label>Total paid<input name="total_paid" type="number" min="0" step="0.01" value="{esc(invoice["total_paid"])}"></label>
+            </div>
+            <div class="invoice-line-list">{line_rows}</div>
+            <div class="invoice-live-total"><span>Estimated total including GST</span><strong data-invoice-total>{money(invoice["total_inc_gst"])}</strong></div>
+            <label>Notes<textarea name="notes" rows="3">{esc(invoice["notes"])}</textarea></label>
+            <div class="form-actions">
+              <button class="button primary" type="submit">Save invoice</button>
+              <a class="button secondary" href="/admin/invoices">Cancel</a>
+            </div>
+          </form>
+          {INVOICE_FORM_SCRIPT}
+        </section>
+        """
+        self.respond(layout(f"Edit Invoice {invoice['invoice_number']}", body, True, noindex=True))
+
+    def admin_invoice_delete(self, invoice_id):
+        if not self.require_admin():
+            return
+        if self.command != "POST":
+            return self.redirect("/admin/invoices")
+        try:
+            invoice_id = int(invoice_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        with db() as conn:
+            # Temporary testing rule:
+            # all invoice statuses are editable/deletable.
+            # Before formal production use,
+            # restrict Sent/Paid invoices.
+            conn.execute("DELETE FROM invoice_lines WHERE invoice_id = ?", (invoice_id,))
+            conn.execute("DELETE FROM invoices WHERE id = ?", (invoice_id,))
+            conn.commit()
+        return self.redirect("/admin/invoices?saved=deleted")
 
     def admin_invoice_print(self, invoice_id):
         if not self.require_admin():
@@ -1955,7 +2134,7 @@ Sitemap: {SITE_URL}/sitemap.xml
             f"""
             <tr>
               <td>{esc(line["product_code"])}</td>
-              <td>{esc(line["description"])}</td>
+              <td>{esc(invoice_description_display(line["description"], line["size"]))}</td>
               <td>{esc(line["carton_quantity"])}</td>
               <td>{esc(line["quantity"])}</td>
               <td>{money(line["unit_price_ex_gst"])}</td>
@@ -2006,7 +2185,18 @@ Sitemap: {SITE_URL}/sitemap.xml
             </section>
             <div class="quotation-table invoice-table">
               <table>
-                <thead><tr><th>Code</th><th>Description</th><th>Carton qty</th><th>Qty</th><th>Unit ex GST</th><th>Tax</th><th>Subtotal</th><th>GST</th><th>Total</th></tr></thead>
+                <colgroup>
+                  <col class="invoice-col-code">
+                  <col class="invoice-col-description">
+                  <col class="invoice-col-uom">
+                  <col class="invoice-col-qty">
+                  <col class="invoice-col-unit">
+                  <col class="invoice-col-tax">
+                  <col class="invoice-col-subtotal">
+                  <col class="invoice-col-gst">
+                  <col class="invoice-col-total">
+                </colgroup>
+                <thead><tr><th>Code</th><th>Description</th><th>UoM</th><th>Qty</th><th>Unit price<br>ex GST</th><th>Tax</th><th>Subtotal</th><th>GST</th><th>Total</th></tr></thead>
                 <tbody>{line_rows}</tbody>
               </table>
             </div>

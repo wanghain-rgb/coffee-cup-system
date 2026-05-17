@@ -939,6 +939,18 @@ textarea:disabled {
   margin-left: 6px;
 }
 
+.action-group,
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-group .inline-form {
+  margin-left: 0;
+}
+
 .link-button {
   width: auto;
   min-height: 32px;
@@ -1480,6 +1492,24 @@ textarea:disabled {
 .invoice-payment-instructions {
   padding-top: 8px;
   border-top: 1px solid rgba(8, 47, 37, 0.1);
+}
+
+.invoice-table table {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+
+.invoice-table th,
+.invoice-table td {
+  overflow-wrap: anywhere;
+}
+
+.invoice-table td:nth-child(5),
+.invoice-table td:nth-child(7),
+.invoice-table td:nth-child(8),
+.invoice-table td:nth-child(9) {
+  text-align: right;
 }
 
 .invoice-print-footer {
@@ -2063,6 +2093,7 @@ footer {
 
   .quotation-table table,
   table {
+    width: 100%;
     min-width: 0;
     color: #111;
     font-size: 9.4px;
@@ -2085,35 +2116,87 @@ footer {
     white-space: nowrap;
   }
 
+  .invoice-table th {
+    white-space: normal;
+  }
+
+  .invoice-col-code {
+    width: 9%;
+  }
+
+  .invoice-col-description {
+    width: 29%;
+  }
+
+  .invoice-col-uom {
+    width: 7%;
+  }
+
+  .invoice-col-qty {
+    width: 5%;
+  }
+
+  .invoice-col-unit {
+    width: 11%;
+  }
+
+  .invoice-col-tax {
+    width: 6%;
+  }
+
+  .invoice-col-subtotal {
+    width: 11%;
+  }
+
+  .invoice-col-gst {
+    width: 8%;
+  }
+
+  .invoice-col-total {
+    width: 10%;
+  }
+
   .invoice-table th:nth-child(1),
   .invoice-table td:nth-child(1) {
-    width: 10%;
+    width: 9%;
   }
 
   .invoice-table th:nth-child(2),
   .invoice-table td:nth-child(2) {
-    width: 28%;
+    width: 29%;
   }
 
   .invoice-table th:nth-child(3),
   .invoice-table td:nth-child(3) {
-    width: 11%;
+    width: 7%;
   }
 
   .invoice-table th:nth-child(4),
   .invoice-table td:nth-child(4) {
-    width: 6%;
+    width: 5%;
   }
 
   .invoice-table th:nth-child(5),
-  .invoice-table td:nth-child(5),
+  .invoice-table td:nth-child(5) {
+    width: 11%;
+    text-align: right;
+  }
+
   .invoice-table th:nth-child(7),
-  .invoice-table td:nth-child(7),
+  .invoice-table td:nth-child(7) {
+    width: 11%;
+    text-align: right;
+  }
+
   .invoice-table th:nth-child(8),
-  .invoice-table td:nth-child(8),
+  .invoice-table td:nth-child(8) {
+    width: 8%;
+    text-align: right;
+  }
+
   .invoice-table th:nth-child(9),
   .invoice-table td:nth-child(9) {
-    width: 9%;
+    width: 10%;
     text-align: right;
   }
 
