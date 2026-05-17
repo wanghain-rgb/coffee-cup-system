@@ -736,6 +736,38 @@ def company_master(conn):
     return conn.execute("SELECT * FROM company_master WHERE id = 1").fetchone()
 
 
+def split_address_lines(value):
+    value = (value or "").strip()
+    if not value:
+        return []
+    if "\n" in value or "\r" in value:
+        raw_lines = value.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    else:
+        raw_lines = value.split(",")
+    return [line.strip() for line in raw_lines if line.strip()]
+
+
+def invoice_address_html(name, address):
+    lines = [name] + split_address_lines(address)
+    if address and not any(line.lower() == "australia" for line in lines):
+        lines.append("Australia")
+    return "".join(f"<p>{esc(line)}</p>" for line in lines if line)
+
+
+def company_invoice_html(company):
+    company_lines = [f'<strong>{esc(company["company_name"])}</strong>']
+    company_lines.extend(f"<span>{esc(line)}</span>" for line in split_address_lines(company["address"]))
+    if company["phone"]:
+        company_lines.append(f'<span>Phone: {esc(company["phone"])}</span>')
+    if company["email"]:
+        company_lines.append(f'<span>{esc(company["email"])}</span>')
+    if company["website"]:
+        company_lines.append(f'<span>{esc(company["website"])}</span>')
+    if company["abn"]:
+        company_lines.append(f'<span>ABN: {esc(company["abn"])}</span>')
+    return "".join(company_lines)
+
+
 def product_by_id():
     return {product["id"]: product for product in PUBLIC_PRODUCTS}
 
@@ -2148,6 +2180,9 @@ Sitemap: {SITE_URL}/sitemap.xml
         )
         bill_to = invoice["billing_address"] or invoice["suburb"] or ""
         ship_to = invoice["shipping_address"] or bill_to
+        company_block = company_invoice_html(company)
+        bill_to_block = invoice_address_html(invoice["business_name"], bill_to)
+        ship_to_block = invoice_address_html(invoice["business_name"], ship_to)
         body = f"""
         <section class="invoice-page">
           <div class="quotation-actions no-print">
@@ -2161,11 +2196,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                 <img class="invoice-logo" src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
               </div>
               <div class="invoice-company">
-                <strong>{esc(company["company_name"])}</strong>
-                <span>ABN: {esc(company["abn"])}</span>
-                <span>{esc(company["address"])}</span>
-                <span>{esc(company["phone"])} &middot; {esc(company["email"])}</span>
-                <span>{esc(company["website"])}</span>
+                {company_block}
               </div>
             </header>
             <section class="invoice-title-row">
@@ -2180,8 +2211,8 @@ Sitemap: {SITE_URL}/sitemap.xml
               </div>
             </section>
             <section class="invoice-addresses">
-              <div><h2>Bill to</h2><strong>{esc(invoice["business_name"])}</strong><p>{esc(bill_to)}</p><p>ABN: {esc(invoice["abn"])}</p><p>{esc(invoice["contact_name"])} &middot; {esc(invoice["email"])} &middot; {esc(invoice["phone"])}</p></div>
-              <div><h2>Ship to</h2><strong>{esc(invoice["business_name"])}</strong><p>{esc(ship_to)}</p></div>
+              <div><h2>Bill to</h2>{bill_to_block}</div>
+              <div><h2>Ship to</h2>{ship_to_block}</div>
             </section>
             <div class="quotation-table invoice-table">
               <table>
