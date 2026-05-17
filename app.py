@@ -210,6 +210,15 @@ def money(value):
     return f"${float(value or 0):,.2f}"
 
 
+def display_date(value):
+    if not value:
+        return ""
+    try:
+        return date.fromisoformat(str(value)).strftime("%d/%m/%Y")
+    except ValueError:
+        return str(value)
+
+
 def esc(value):
     return html.escape("" if value is None else str(value))
 
@@ -325,7 +334,12 @@ CREATE TABLE IF NOT EXISTS company_master (
 CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_number TEXT UNIQUE NOT NULL,
+    sales_order_id INTEGER REFERENCES sales_orders(id),
     customer_id INTEGER NOT NULL REFERENCES customers(id),
+    customer_business_name TEXT,
+    customer_abn TEXT,
+    billing_address TEXT,
+    shipping_address TEXT,
     issue_date TEXT NOT NULL,
     due_date TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'Draft',
@@ -368,6 +382,11 @@ def init_db():
         ensure_column(conn, "products", "product_type", "product_type TEXT")
         ensure_column(conn, "products", "tax_type", "tax_type TEXT NOT NULL DEFAULT 'GST'")
         ensure_column(conn, "products", "barcode", "barcode TEXT")
+        ensure_column(conn, "invoices", "sales_order_id", "sales_order_id INTEGER REFERENCES sales_orders(id)")
+        ensure_column(conn, "invoices", "customer_business_name", "customer_business_name TEXT")
+        ensure_column(conn, "invoices", "customer_abn", "customer_abn TEXT")
+        ensure_column(conn, "invoices", "billing_address", "billing_address TEXT")
+        ensure_column(conn, "invoices", "shipping_address", "shipping_address TEXT")
 
         if conn.is_postgres:
             conn.execute(
@@ -651,6 +670,120 @@ def insert_invoice_lines(conn, invoice_id, selected_lines):
                 line["total_inc_gst"],
             ),
         )
+
+
+def customer_snapshot(conn, customer_id):
+    customer = conn.execute("SELECT * FROM customers WHERE id = ?", (customer_id,)).fetchone()
+    if not customer:
+        return {
+            "business_name": "",
+            "abn": "",
+            "billing_address": "",
+            "shipping_address": "",
+        }
+    billing_address = customer["billing_address"] or customer["suburb"] or ""
+    shipping_address = customer["shipping_address"] or billing_address
+    return {
+        "business_name": customer["business_name"],
+        "abn": customer["abn"] or "",
+        "billing_address": billing_address,
+        "shipping_address": shipping_address,
+    }
+
+
+def create_invoice_from_sales_order(conn, sales_order_id):
+    existing = conn.execute("SELECT id FROM invoices WHERE sales_order_id = ? ORDER BY id LIMIT 1", (sales_order_id,)).fetchone()
+    if existing:
+        return existing["id"], False
+
+    order = conn.execute(
+        """
+        SELECT o.*, c.business_name
+        FROM sales_orders o
+        JOIN customers c ON c.id = o.customer_id
+        WHERE o.id = ?
+        """,
+        (sales_order_id,),
+    ).fetchone()
+    if not order:
+        return None, False
+
+    sales_lines = conn.execute(
+        """
+        SELECT l.*, p.sku, p.name, p.size, p.product_type, p.qty_per_carton, p.tax_type
+        FROM sales_lines l
+        JOIN products p ON p.id = l.product_id
+        WHERE l.order_id = ?
+        ORDER BY l.id
+        """,
+        (sales_order_id,),
+    ).fetchall()
+    if not sales_lines:
+        return None, False
+
+    selected_lines = []
+    subtotal_total = 0.0
+    gst_total = 0.0
+    for line in sales_lines:
+        tax_type = line["tax_type"] or "GST"
+        line_subtotal = float(line["qty_cartons"] or 0) * float(line["sell_price"] or 0)
+        line_gst = line_subtotal * 0.10 if tax_type == "GST" else 0.0
+        selected_lines.append(
+            {
+                "product_id": line["product_id"],
+                "product_code": line["sku"],
+                "description": invoice_description(line["name"], line["size"]),
+                "size": line["size"],
+                "product_type": line["product_type"] or "",
+                "carton_quantity": line["qty_per_carton"],
+                "quantity": line["qty_cartons"],
+                "unit_price_ex_gst": line["sell_price"],
+                "tax_type": tax_type,
+                "subtotal_ex_gst": line_subtotal,
+                "gst_amount": line_gst,
+                "total_inc_gst": line_subtotal + line_gst,
+            }
+        )
+        subtotal_total += line_subtotal
+        gst_total += line_gst
+
+    issue_date = date.today().isoformat()
+    due_date = (date.fromisoformat(issue_date) + timedelta(days=7)).isoformat()
+    total_inc_gst = subtotal_total + gst_total
+    invoice_number = next_invoice_number(conn, issue_date)
+    payment_terms = "Payment due within 7 days of invoice date."
+    snapshot = customer_snapshot(conn, order["customer_id"])
+    cur = conn.execute(
+        """
+        INSERT INTO invoices
+        (invoice_number, sales_order_id, customer_id, customer_business_name, customer_abn,
+         billing_address, shipping_address, issue_date, due_date, status, subtotal_ex_gst,
+         gst_amount, total_inc_gst, total_paid, balance_due, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            invoice_number,
+            sales_order_id,
+            order["customer_id"],
+            snapshot["business_name"],
+            snapshot["abn"],
+            snapshot["billing_address"],
+            snapshot["shipping_address"],
+            issue_date,
+            due_date,
+            "Sent",
+            subtotal_total,
+            gst_total,
+            total_inc_gst,
+            0,
+            total_inc_gst,
+            payment_terms,
+        ),
+    )
+    invoice_id = cur.lastrowid
+    insert_invoice_lines(conn, invoice_id, selected_lines)
+    conn.execute("UPDATE sales_orders SET status = ? WHERE id = ?", ("Invoiced", sales_order_id))
+    return invoice_id, True
 
 
 def invoice_line_form_rows(conn, existing_lines=None, max_lines=8):
@@ -1215,6 +1348,13 @@ class App(BaseHTTPRequestHandler):
                 return self.admin_invoice_delete(parts[2])
             if len(parts) == 3:
                 return self.admin_invoice_print(parts[2])
+            return self.respond("Not found", 404, content_type="text/plain")
+        if path.startswith("/admin/sales/"):
+            parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[3] == "issue-invoice":
+                return self.admin_sales_issue_invoice(parts[2])
+            if len(parts) == 3:
+                return self.admin_sales_detail(parts[2])
             return self.respond("Not found", 404, content_type="text/plain")
         routes = {
             "/": self.catalogue,
@@ -1953,16 +2093,22 @@ Sitemap: {SITE_URL}/sitemap.xml
                 total_inc_gst = subtotal_total + gst_total
                 total_paid = float(f.get("total_paid") or 0)
                 invoice_number = next_invoice_number(conn, issue_date)
+                snapshot = customer_snapshot(conn, int(f.get("customer_id")))
                 cur = conn.execute(
                     """
                     INSERT INTO invoices
-                    (invoice_number, customer_id, issue_date, due_date, status, subtotal_ex_gst,
+                    (invoice_number, customer_id, customer_business_name, customer_abn,
+                     billing_address, shipping_address, issue_date, due_date, status, subtotal_ex_gst,
                      gst_amount, total_inc_gst, total_paid, balance_due, notes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         invoice_number,
                         int(f.get("customer_id")),
+                        snapshot["business_name"],
+                        snapshot["abn"],
+                        snapshot["billing_address"],
+                        snapshot["shipping_address"],
                         issue_date,
                         due_date,
                         f.get("status") or "Draft",
@@ -1997,8 +2143,8 @@ Sitemap: {SITE_URL}/sitemap.xml
             [
                 esc(r["invoice_number"]),
                 esc(r["business_name"]),
-                esc(r["issue_date"]),
-                esc(r["due_date"]),
+                esc(display_date(r["issue_date"])),
+                esc(display_date(r["due_date"])),
                 money(r["total_inc_gst"]),
                 money(r["balance_due"]),
                 esc(r["status"]),
@@ -2059,6 +2205,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                 else:
                     total_inc_gst = subtotal_total + gst_total
                     total_paid = float(f.get("total_paid") or 0)
+                    snapshot = customer_snapshot(conn, int(f.get("customer_id")))
                     # Temporary testing rule:
                     # all invoice statuses are editable/deletable.
                     # Before formal production use,
@@ -2066,13 +2213,19 @@ Sitemap: {SITE_URL}/sitemap.xml
                     conn.execute(
                         """
                         UPDATE invoices
-                        SET customer_id = ?, issue_date = ?, due_date = ?, status = ?,
+                        SET customer_id = ?, customer_business_name = ?, customer_abn = ?,
+                            billing_address = ?, shipping_address = ?,
+                            issue_date = ?, due_date = ?, status = ?,
                             subtotal_ex_gst = ?, gst_amount = ?, total_inc_gst = ?,
                             total_paid = ?, balance_due = ?, notes = ?
                         WHERE id = ?
                         """,
                         (
                             int(f.get("customer_id")),
+                            snapshot["business_name"],
+                            snapshot["abn"],
+                            snapshot["billing_address"],
+                            snapshot["shipping_address"],
                             issue_date,
                             due_date,
                             f.get("status") or "Draft",
@@ -2143,6 +2296,12 @@ Sitemap: {SITE_URL}/sitemap.xml
     def admin_invoice_print(self, invoice_id):
         if not self.require_admin():
             return
+        notice_value = parse_qs(urlparse(self.path).query).get("notice", [""])[0]
+        notice = ""
+        if notice_value == "invoice_exists":
+            notice = '<p class="notice no-print">Invoice already exists for this sales order.</p>'
+        elif notice_value == "invoice_issued":
+            notice = '<p class="notice no-print">Invoice issued from sales order.</p>'
         try:
             invoice_id = int(invoice_id)
         except ValueError:
@@ -2151,8 +2310,9 @@ Sitemap: {SITE_URL}/sitemap.xml
             company = company_master(conn)
             invoice = conn.execute(
                 """
-                SELECT i.*, c.business_name, c.abn, c.contact_name, c.email, c.phone,
-                       c.billing_address, c.shipping_address, c.suburb
+                SELECT i.*, c.business_name AS current_business_name, c.abn AS current_abn,
+                       c.billing_address AS current_billing_address,
+                       c.shipping_address AS current_shipping_address, c.suburb AS current_suburb
                 FROM invoices i
                 JOIN customers c ON c.id = i.customer_id
                 WHERE i.id = ?
@@ -2178,13 +2338,20 @@ Sitemap: {SITE_URL}/sitemap.xml
             """
             for line in lines
         )
-        bill_to = invoice["billing_address"] or invoice["suburb"] or ""
-        ship_to = invoice["shipping_address"] or bill_to
+        customer_name = invoice["customer_business_name"] or invoice["current_business_name"]
+        bill_to = invoice["billing_address"] or invoice["current_billing_address"] or invoice["current_suburb"] or ""
+        ship_to = invoice["shipping_address"] or invoice["current_shipping_address"] or bill_to
         company_block = company_invoice_html(company)
-        bill_to_block = invoice_address_html(invoice["business_name"], bill_to)
-        ship_to_block = invoice_address_html(invoice["business_name"], ship_to)
+        bill_to_block = invoice_address_html(customer_name, bill_to)
+        ship_to_block = invoice_address_html(customer_name, ship_to)
+        payment_terms = (
+            invoice["notes"]
+            if invoice["notes"] == "Payment due within 7 days of invoice date."
+            else f"Due by {display_date(invoice['due_date'])}"
+        )
         body = f"""
         <section class="invoice-page">
+          {notice}
           <div class="quotation-actions no-print">
             <button class="button primary" type="button" onclick="window.print()">Print / Save as PDF</button>
             <a class="button ghost" href="/admin/invoices">Back to Invoices</a>
@@ -2204,8 +2371,8 @@ Sitemap: {SITE_URL}/sitemap.xml
               <div class="invoice-meta">
                 <dl>
                   <div><dt>Invoice number</dt><dd>{esc(invoice["invoice_number"])}</dd></div>
-                  <div><dt>Issue date</dt><dd>{esc(invoice["issue_date"])}</dd></div>
-                  <div><dt>Due date</dt><dd>{esc(invoice["due_date"])}</dd></div>
+                  <div><dt>Issue date</dt><dd>{esc(display_date(invoice["issue_date"]))}</dd></div>
+                  <div><dt>Due date</dt><dd>{esc(display_date(invoice["due_date"]))}</dd></div>
                   <div><dt>Status</dt><dd>{esc(invoice["status"])}</dd></div>
                 </dl>
               </div>
@@ -2236,8 +2403,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                 <div><span>Subtotal excluding GST</span><strong>{money(invoice["subtotal_ex_gst"])}</strong></div>
                 <div><span>GST</span><strong>{money(invoice["gst_amount"])}</strong></div>
                 <div><span>Total including GST</span><strong>{money(invoice["total_inc_gst"])}</strong></div>
-                <div><span>Total paid</span><strong>{money(invoice["total_paid"])}</strong></div>
-                <div class="balance"><span>Balance due</span><strong>{money(invoice["balance_due"])}</strong></div>
+                <div class="balance"><span>Balance</span><strong>{money(invoice["balance_due"])}</strong></div>
               </div>
             </section>
             <section class="invoice-payment">
@@ -2248,11 +2414,11 @@ Sitemap: {SITE_URL}/sitemap.xml
                 <p><span>BSB</span><strong>{esc(company["bsb"])}</strong></p>
                 <p><span>Account number</span><strong>{esc(company["account_number"])}</strong></p>
                 <p><span>Payment reference</span><strong>{esc(invoice["invoice_number"])}</strong></p>
-                <p><span>Payment terms</span><strong>Due by {esc(invoice["due_date"])}</strong></p>
+                <p><span>Payment terms</span><strong>{esc(payment_terms)}</strong></p>
               </div>
               <p class="invoice-payment-instructions">{esc(company["payment_instructions"])}</p>
             </section>
-            <footer class="invoice-print-footer">Invoice {esc(invoice["invoice_number"])} &middot; Due {esc(invoice["due_date"])} &middot; Balance due {money(invoice["balance_due"])}</footer>
+            <footer class="invoice-print-footer">Invoice {esc(invoice["invoice_number"])} &middot; Due {esc(display_date(invoice["due_date"]))} &middot; Balance {money(invoice["balance_due"])}</footer>
           </div>
         </section>
         """
@@ -2362,6 +2528,10 @@ Sitemap: {SITE_URL}/sitemap.xml
         saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
         if saved == "sales":
             message = '<p class="notice">Sales order saved successfully.</p>'
+        elif saved == "invoice_exists":
+            message = '<p class="notice">Invoice already exists for this sales order.</p>'
+        elif saved == "invoice_issued":
+            message = '<p class="notice">Invoice issued from sales order.</p>'
         if self.command == "POST":
             f = self.form()
             product_id = int(f.get("product_id"))
@@ -2397,7 +2567,7 @@ Sitemap: {SITE_URL}/sitemap.xml
             default_sell = conn.execute("SELECT sell_price FROM products ORDER BY sku LIMIT 1").fetchone()
             rows = conn.execute(
                 """
-                SELECT o.order_date, c.business_name, p.sku, p.name, l.qty_cartons,
+                SELECT o.id, o.order_date, o.status, c.business_name, p.sku, p.name, l.qty_cartons,
                        l.sell_price, l.cost_price, l.revenue, l.cost, l.gross_profit
                 FROM sales_lines l
                 JOIN sales_orders o ON o.id = l.order_id
@@ -2408,7 +2578,8 @@ Sitemap: {SITE_URL}/sitemap.xml
             ).fetchall()
         sales_rows = [
             [
-                esc(r["order_date"]),
+                esc(display_date(r["order_date"])),
+                esc(r["status"]),
                 esc(r["business_name"]),
                 esc(r["sku"]),
                 esc(r["name"]),
@@ -2418,13 +2589,14 @@ Sitemap: {SITE_URL}/sitemap.xml
                 money(r["revenue"]),
                 money(r["cost"]),
                 money(r["gross_profit"]),
+                f'<a class="mini-quote" href="/admin/sales/{esc(r["id"])}">Details</a>',
             ]
             for r in rows
         ]
         body = f"""
         <section class="section-head"><h1>Sales Order Entry</h1><p>Create one-line sales orders and calculate gross profit from FIFO batch cost.</p></section>
         {message}
-        {table(["Date", "Customer", "SKU", "Product", "Qty", "Sell/carton", "Cost/carton", "Revenue", "Cost", "Gross profit"], sales_rows)}
+        {table(["Date", "Status", "Customer", "SKU", "Product", "Qty", "Sell/carton", "Cost/carton", "Revenue", "Cost", "Gross profit", "Action"], sales_rows)}
         <section class="panel">
           <h2>Add sales order</h2>
           <form method="post" class="form grid-form">
@@ -2439,6 +2611,113 @@ Sitemap: {SITE_URL}/sitemap.xml
         </section>
         """
         self.respond(layout("Sales Orders", body, True, noindex=True))
+
+    def admin_sales_detail(self, order_id):
+        if not self.require_admin():
+            return
+        try:
+            order_id = int(order_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        notice = ""
+        saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
+        if saved == "invoice_exists":
+            notice = '<p class="notice">Invoice already exists for this sales order.</p>'
+        elif saved == "invoice_issued":
+            notice = '<p class="notice">Invoice issued from sales order.</p>'
+        with db() as conn:
+            order = conn.execute(
+                """
+                SELECT o.*, c.business_name, c.abn, c.billing_address, c.shipping_address, c.suburb
+                FROM sales_orders o
+                JOIN customers c ON c.id = o.customer_id
+                WHERE o.id = ?
+                """,
+                (order_id,),
+            ).fetchone()
+            if not order:
+                return self.respond("Not found", 404, content_type="text/plain")
+            lines = conn.execute(
+                """
+                SELECT l.*, p.sku, p.name, p.size, p.qty_per_carton, p.tax_type
+                FROM sales_lines l
+                JOIN products p ON p.id = l.product_id
+                WHERE l.order_id = ?
+                ORDER BY l.id
+                """,
+                (order_id,),
+            ).fetchall()
+            invoice = conn.execute(
+                "SELECT id, invoice_number FROM invoices WHERE sales_order_id = ? ORDER BY id LIMIT 1",
+                (order_id,),
+            ).fetchone()
+        line_rows = [
+            [
+                esc(r["sku"]),
+                esc(invoice_description(r["name"], r["size"])),
+                esc(r["qty_per_carton"]),
+                esc(r["qty_cartons"]),
+                money(r["sell_price"]),
+                esc(r["tax_type"] or "GST"),
+                money(r["revenue"]),
+            ]
+            for r in lines
+        ]
+        if invoice:
+            actions = f"""
+            <div class="form-actions">
+              <a class="button primary" href="/admin/invoices/{esc(invoice["id"])}">View Invoice</a>
+              <a class="button secondary" href="/admin/invoices/{esc(invoice["id"])}">Print Invoice</a>
+            </div>
+            """
+        else:
+            actions = f"""
+            <form method="post" action="/admin/sales/{esc(order_id)}/issue-invoice" class="form-actions">
+              <button class="button primary" type="submit">Issue Invoice</button>
+            </form>
+            """
+        body = f"""
+        <section class="section-head"><h1>Sales Order #{esc(order["id"])}</h1><p>Customer order details and invoice issue action.</p></section>
+        {notice}
+        <section class="panel">
+          <div class="invoice-meta">
+            <dl>
+              <div><dt>Order date</dt><dd>{esc(display_date(order["order_date"]))}</dd></div>
+              <div><dt>Status</dt><dd>{esc(order["status"])}</dd></div>
+              <div><dt>Customer</dt><dd>{esc(order["business_name"])}</dd></div>
+              <div><dt>Invoice</dt><dd>{esc(invoice["invoice_number"] if invoice else "Not issued")}</dd></div>
+            </dl>
+          </div>
+          {actions}
+        </section>
+        {table(["Code", "Description", "UoM", "Qty", "Unit ex GST", "Tax", "Subtotal"], line_rows)}
+        <section class="panel">
+          <h2>Addresses copied to invoice</h2>
+          <div class="invoice-addresses">
+            <div><h2>Bill to</h2>{invoice_address_html(order["business_name"], order["billing_address"] or order["suburb"] or "")}</div>
+            <div><h2>Ship to</h2>{invoice_address_html(order["business_name"], order["shipping_address"] or order["billing_address"] or order["suburb"] or "")}</div>
+          </div>
+        </section>
+        """
+        self.respond(layout(f"Sales Order {order_id}", body, True, noindex=True))
+
+    def admin_sales_issue_invoice(self, order_id):
+        if not self.require_admin():
+            return
+        if self.command != "POST":
+            return self.redirect(f"/admin/sales/{esc(order_id)}")
+        try:
+            order_id = int(order_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        with db() as conn:
+            invoice_id, created = create_invoice_from_sales_order(conn, order_id)
+            if not invoice_id:
+                return self.respond("Not found", 404, content_type="text/plain")
+            conn.commit()
+        if created:
+            return self.redirect(f"/admin/invoices/{invoice_id}?notice=invoice_issued")
+        return self.redirect(f"/admin/invoices/{invoice_id}?notice=invoice_exists")
 
     def allocate_fifo(self, conn, product_id, qty):
         remaining = qty
