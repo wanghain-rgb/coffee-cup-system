@@ -37,6 +37,8 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
             return self.respond("Not found", 404, content_type="text/plain")
         if path.startswith("/admin/sales/"):
             parts = path.strip("/").split("/")
+            if len(parts) == 4 and parts[3] == "confirm":
+                return self.admin_sales_confirm(parts[2])
             if len(parts) == 4 and parts[3] == "issue-invoice":
                 return self.admin_sales_issue_invoice(parts[2])
             if len(parts) == 3:
@@ -502,57 +504,51 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
             return
         message = ""
         saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
-        if saved == "sales":
-            message = '<p class="notice">Sales order saved successfully.</p>'
+        if saved == "created":
+            message = '<p class="notice">Draft sales order saved successfully.</p>'
+        elif saved == "confirmed":
+            message = '<p class="notice">Sales order confirmed and inventory deducted.</p>'
+        elif saved == "locked":
+            message = '<p class="alert">Only Draft sales orders can be confirmed. Inventory was not deducted again.</p>'
+        elif saved == "stock":
+            message = '<p class="alert">Not enough stock to confirm this sales order.</p>'
+        elif saved == "no_lines":
+            message = '<p class="alert">Please add at least one sales order line.</p>'
         elif saved == "invoice_exists":
             message = '<p class="notice">Invoice already exists for this sales order.</p>'
         elif saved == "invoice_issued":
             message = '<p class="notice">Invoice issued from sales order.</p>'
+        elif saved == "invoice_blocked":
+            message = '<p class="alert">Please confirm the sales order before issuing an invoice.</p>'
         if self.command == "POST":
             f = self.form()
-            product_id = int(f.get("product_id"))
-            qty = int(f.get("qty_cartons") or 0)
-            sell_price = float(f.get("sell_price") or 0)
             with db() as conn:
-                stock = conn.execute(
-                    "SELECT COALESCE(SUM(remaining_cartons),0) FROM purchase_lines WHERE product_id = ?",
-                    (product_id,),
-                ).fetchone()[0]
-                if qty <= 0 or stock < qty:
-                    message = '<p class="alert">Not enough stock for this sales order.</p>'
-                else:
-                    cost_total = self.allocate_fifo(conn, product_id, qty)
-                    conn.execute(
-                        "UPDATE products SET stock_qty = CASE WHEN COALESCE(stock_qty, 0) > ? THEN stock_qty - ? ELSE 0 END WHERE id = ?",
-                        (qty, qty, product_id),
-                    )
-                    revenue = qty * sell_price
-                    cur = conn.execute(
-                        "INSERT INTO sales_orders (customer_id, order_date, status, notes) VALUES (?, ?, ?, ?)",
-                        (int(f.get("customer_id")), f.get("order_date"), "Entered", f.get("notes")),
-                    )
-                    conn.execute(
-                        """
-                        INSERT INTO sales_lines
-                        (order_id, product_id, qty_cartons, sell_price, cost_price, revenue, cost, gross_profit)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                        """,
-                        (cur.lastrowid, product_id, qty, sell_price, cost_total / qty, revenue, cost_total, revenue - cost_total),
-                    )
-                    conn.commit()
-                    return self.redirect("/admin/sales?saved=sales")
+                selected_lines, revenue_total = parse_sales_lines(conn, f)
+                if not selected_lines:
+                    return self.redirect("/admin/sales?saved=no_lines")
+                if not f.get("customer_id"):
+                    return self.redirect("/admin/sales?saved=no_lines")
+                cur = conn.execute(
+                    "INSERT INTO sales_orders (customer_id, order_date, status, notes) VALUES (?, ?, 'Draft', ?)",
+                    (int(f.get("customer_id")), f.get("order_date") or date.today().isoformat(), f.get("notes")),
+                )
+                insert_sales_lines(conn, cur.lastrowid, selected_lines)
+                conn.commit()
+                return self.redirect(f"/admin/sales/{cur.lastrowid}?saved=created")
         with db() as conn:
-            product_opts = product_options(conn)
             customer_opts = customer_options(conn)
-            default_sell = conn.execute("SELECT sell_price FROM products ORDER BY sku LIMIT 1").fetchone()
+            line_rows = sales_line_form_rows(conn, max_lines=8)
             rows = conn.execute(
                 """
-                SELECT o.id, o.order_date, o.status, c.business_name, p.sku, p.name, l.qty_cartons,
-                       l.sell_price, l.cost_price, l.revenue, l.cost, l.gross_profit
-                FROM sales_lines l
-                JOIN sales_orders o ON o.id = l.order_id
+                SELECT o.id, o.order_date, o.status, c.business_name,
+                       COUNT(l.id) AS line_count,
+                       COALESCE(SUM(l.revenue), 0) AS revenue,
+                       COALESCE(SUM(l.cost), 0) AS cost,
+                       COALESCE(SUM(l.gross_profit), 0) AS gross_profit
+                FROM sales_orders o
                 JOIN customers c ON c.id = o.customer_id
-                JOIN products p ON p.id = l.product_id
+                LEFT JOIN sales_lines l ON l.order_id = o.id
+                GROUP BY o.id, o.order_date, o.status, c.business_name
                 ORDER BY o.order_date DESC, o.id DESC
                 """
             ).fetchall()
@@ -561,11 +557,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
                 esc(display_date(r["order_date"])),
                 esc(r["status"]),
                 esc(r["business_name"]),
-                esc(r["sku"]),
-                esc(r["name"]),
-                esc(r["qty_cartons"]),
-                money(r["sell_price"]),
-                money(r["cost_price"]),
+                esc(r["line_count"]),
                 money(r["revenue"]),
                 money(r["cost"]),
                 money(r["gross_profit"]),
@@ -574,20 +566,22 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
             for r in rows
         ]
         body = f"""
-        <section class="section-head"><h1>Sales Order Entry</h1><p>Create one-line sales orders and calculate gross profit from FIFO batch cost.</p></section>
+        <section class="section-head"><h1>Sales Order Entry</h1><p>Create draft sales orders, then confirm once to deduct FIFO inventory.</p></section>
         {message}
-        {table(["Date", "Status", "Customer", "SKU", "Product", "Qty", "Sell/carton", "Cost/carton", "Revenue", "Cost", "Gross profit", "Action"], sales_rows)}
+        {table(["Date", "Status", "Customer", "Lines", "Revenue", "Cost", "Gross profit", "Action"], sales_rows)}
         <section class="panel">
           <h2>Add sales order</h2>
-          <form method="post" class="form grid-form">
-            <label>Customer<select name="customer_id" required>{customer_opts}</select></label>
-            <label>Date<input name="order_date" type="date" required></label>
-            <label>Product<select name="product_id" required>{product_opts}</select></label>
-            <label>Qty cartons<input name="qty_cartons" type="number" min="1" required></label>
-            <label>Sell price/carton<input name="sell_price" type="number" step="0.01" value="{esc(default_sell[0] if default_sell else 0)}" required></label>
+          <form method="post" class="form invoice-form">
+            <div class="quote-detail-grid">
+              <label>Customer<select name="customer_id" required>{customer_opts}</select></label>
+              <label>Date<input name="order_date" type="date" value="{date.today().isoformat()}" required></label>
+            </div>
+            <div class="sales-line-list">{line_rows}</div>
+            <div class="invoice-live-total"><span>Estimated revenue excluding GST</span><strong data-sales-live-total>$0.00</strong></div>
             <label>Notes<textarea name="notes" rows="3"></textarea></label>
-            <button class="button primary" type="submit">Create order</button>
+            <button class="button primary" type="submit">Save Draft Order</button>
           </form>
+          {SALES_FORM_SCRIPT}
         </section>
         """
         self.respond(layout("Sales Orders", body, True, noindex=True))
@@ -601,7 +595,19 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
             return self.respond("Not found", 404, content_type="text/plain")
         notice = ""
         saved = parse_qs(urlparse(self.path).query).get("saved", [""])[0]
-        if saved == "invoice_exists":
+        if saved == "created":
+            notice = '<p class="notice">Draft sales order saved successfully.</p>'
+        elif saved == "confirmed":
+            notice = '<p class="notice">Sales order confirmed and inventory deducted.</p>'
+        elif saved == "locked":
+            notice = '<p class="alert">Only Draft sales orders can be confirmed. Inventory was not deducted again.</p>'
+        elif saved == "stock":
+            notice = '<p class="alert">Not enough stock to confirm this sales order. Please check inventory before confirming.</p>'
+        elif saved == "no_lines":
+            notice = '<p class="alert">Please add at least one sales order line.</p>'
+        elif saved == "invoice_blocked":
+            notice = '<p class="alert">Please confirm the sales order before issuing an invoice.</p>'
+        elif saved == "invoice_exists":
             notice = '<p class="notice">Invoice already exists for this sales order.</p>'
         elif saved == "invoice_issued":
             notice = '<p class="notice">Invoice issued from sales order.</p>'
@@ -638,16 +644,30 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
                 esc(r["qty_per_carton"]),
                 esc(r["qty_cartons"]),
                 money(r["sell_price"]),
-                esc(r["tax_type"] or "GST"),
+                money(r["cost_price"]),
                 money(r["revenue"]),
+                money(r["cost"]),
+                money(r["gross_profit"]),
             ]
             for r in lines
         ]
+        total_revenue = sum(float(r["revenue"] or 0) for r in lines)
+        total_cost = sum(float(r["cost"] or 0) for r in lines)
+        total_gp = sum(float(r["gross_profit"] or 0) for r in lines)
         if invoice:
             actions = f"""
             <div class="form-actions">
               <a class="button primary" href="/admin/invoices/{esc(invoice["id"])}">View Invoice</a>
               <a class="button secondary" href="/admin/invoices/{esc(invoice["id"])}">Print Invoice</a>
+            </div>
+            """
+        elif order["status"] == "Draft":
+            actions = f"""
+            <div class="form-actions">
+              <form method="post" action="/admin/sales/{esc(order_id)}/confirm" onsubmit="return confirm('Confirm this sales order and deduct inventory? This can only be done once.')">
+                <button class="button primary" type="submit">Confirm Order</button>
+              </form>
+              <p class="help-text">Inventory is not deducted until the order is confirmed.</p>
             </div>
             """
         else:
@@ -666,11 +686,14 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
               <div><dt>Status</dt><dd>{esc(order["status"])}</dd></div>
               <div><dt>Customer</dt><dd>{esc(order["business_name"])}</dd></div>
               <div><dt>Invoice</dt><dd>{esc(invoice["invoice_number"] if invoice else "Not issued")}</dd></div>
+              <div><dt>Revenue</dt><dd>{money(total_revenue)}</dd></div>
+              <div><dt>Cost</dt><dd>{money(total_cost)}</dd></div>
+              <div><dt>Gross profit</dt><dd>{money(total_gp)}</dd></div>
             </dl>
           </div>
           {actions}
         </section>
-        {table(["Code", "Description", "UoM", "Qty", "Unit ex GST", "Tax", "Subtotal"], line_rows)}
+        {table(["Code", "Description", "UoM", "Qty", "Sell/carton", "Cost/carton", "Revenue", "Cost", "Gross profit"], line_rows)}
         <section class="panel">
           <h2>Addresses copied to invoice</h2>
           <div class="invoice-addresses">
@@ -680,6 +703,59 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         </section>
         """
         self.respond(layout(f"Sales Order {order_id}", body, True, noindex=True))
+
+    def admin_sales_confirm(self, order_id):
+        if not self.require_admin():
+            return
+        if self.command != "POST":
+            return self.redirect(f"/admin/sales/{esc(order_id)}")
+        try:
+            order_id = int(order_id)
+        except ValueError:
+            return self.respond("Not found", 404, content_type="text/plain")
+        with db() as conn:
+            order = conn.execute("SELECT status FROM sales_orders WHERE id = ?", (order_id,)).fetchone()
+            if not order:
+                return self.respond("Not found", 404, content_type="text/plain")
+            if order["status"] != "Draft":
+                return self.redirect(f"/admin/sales/{order_id}?saved=locked")
+            lines = conn.execute("SELECT * FROM sales_lines WHERE order_id = ? ORDER BY id", (order_id,)).fetchall()
+            if not lines:
+                return self.redirect(f"/admin/sales/{order_id}?saved=no_lines")
+            shortages = sales_stock_shortages(conn, lines)
+            if shortages:
+                return self.redirect(f"/admin/sales/{order_id}?saved=stock")
+            locked = conn.execute(
+                "UPDATE sales_orders SET status = 'Confirmed', confirmed_at = CURRENT_TIMESTAMP WHERE id = ? AND status = 'Draft'",
+                (order_id,),
+            )
+            if locked.rowcount != 1:
+                return self.redirect(f"/admin/sales/{order_id}?saved=locked")
+            touched_products = set()
+            try:
+                for line in lines:
+                    qty = int(line["qty_cartons"] or 0)
+                    if qty <= 0:
+                        conn.rollback()
+                        return self.redirect(f"/admin/sales/{order_id}?saved=no_lines")
+                    cost_total = self.allocate_fifo(conn, line["product_id"], qty)
+                    revenue = qty * float(line["sell_price"] or 0)
+                    conn.execute(
+                        """
+                        UPDATE sales_lines
+                        SET cost_price = ?, revenue = ?, cost = ?, gross_profit = ?
+                        WHERE id = ?
+                        """,
+                        (cost_total / qty, revenue, cost_total, revenue - cost_total, line["id"]),
+                    )
+                    touched_products.add(line["product_id"])
+                for product_id in touched_products:
+                    refresh_product_inventory_from_batches(conn, product_id)
+                conn.commit()
+            except ValueError:
+                conn.rollback()
+                return self.redirect(f"/admin/sales/{order_id}?saved=stock")
+        return self.redirect(f"/admin/sales/{order_id}?saved=confirmed")
 
     def admin_sales_issue_invoice(self, order_id):
         if not self.require_admin():
@@ -693,7 +769,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         with db() as conn:
             invoice_id, created = create_invoice_from_sales_order(conn, order_id)
             if not invoice_id:
-                return self.respond("Not found", 404, content_type="text/plain")
+                return self.redirect(f"/admin/sales/{order_id}?saved=invoice_blocked")
             conn.commit()
         if created:
             return self.redirect(f"/admin/invoices/{invoice_id}?notice=invoice_issued")

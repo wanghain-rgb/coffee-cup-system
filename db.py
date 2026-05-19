@@ -222,8 +222,9 @@ CREATE TABLE IF NOT EXISTS sales_orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_id INTEGER NOT NULL REFERENCES customers(id),
     order_date TEXT NOT NULL DEFAULT CURRENT_DATE,
-    status TEXT NOT NULL DEFAULT 'Entered',
-    notes TEXT
+    status TEXT NOT NULL DEFAULT 'Draft',
+    notes TEXT,
+    confirmed_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sales_lines (
@@ -306,6 +307,7 @@ def init_db():
         ensure_column(conn, "products", "barcode", "barcode TEXT")
         ensure_column(conn, "products", "stock_qty", "stock_qty REAL NOT NULL DEFAULT 0")
         ensure_column(conn, "products", "avg_cost", "avg_cost REAL NOT NULL DEFAULT 0")
+        ensure_column(conn, "sales_orders", "confirmed_at", "confirmed_at TEXT")
         ensure_column(conn, "invoices", "sales_order_id", "sales_order_id INTEGER REFERENCES sales_orders(id)")
         ensure_column(conn, "invoices", "customer_business_name", "customer_business_name TEXT")
         ensure_column(conn, "invoices", "customer_abn", "customer_abn TEXT")

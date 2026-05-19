@@ -1286,6 +1286,11 @@ textarea:disabled {
   gap: 12px;
 }
 
+.sales-line-list {
+  display: grid;
+  gap: 12px;
+}
+
 .invoice-line-entry {
   display: grid;
   grid-template-columns: minmax(180px, 1.2fr) minmax(90px, 0.55fr) minmax(180px, 1.4fr) minmax(92px, 0.55fr) minmax(72px, 0.45fr) minmax(90px, 0.55fr) minmax(130px, 0.75fr) minmax(120px, 0.75fr);
@@ -1300,6 +1305,17 @@ textarea:disabled {
 .po-line-entry {
   display: grid;
   grid-template-columns: minmax(190px, 1.2fr) minmax(90px, 0.55fr) minmax(190px, 1.4fr) minmax(90px, 0.55fr) minmax(130px, 0.75fr) minmax(110px, 0.65fr) minmax(120px, 0.7fr);
+  gap: 10px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid rgba(8, 47, 37, 0.1);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.sales-line-entry {
+  display: grid;
+  grid-template-columns: minmax(190px, 1.25fr) minmax(90px, 0.55fr) minmax(190px, 1.35fr) minmax(90px, 0.55fr) minmax(130px, 0.75fr) minmax(120px, 0.7fr);
   gap: 10px;
   align-items: end;
   padding: 14px;
@@ -1938,7 +1954,8 @@ footer {
   .invoice-bottom,
   .invoice-payment-grid,
   .invoice-line-entry,
-  .po-line-entry {
+  .po-line-entry,
+  .sales-line-entry {
     grid-template-columns: 1fr;
   }
 

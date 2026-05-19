@@ -397,6 +397,8 @@ def create_invoice_from_sales_order(conn, sales_order_id):
     ).fetchone()
     if not order:
         return None, False
+    if order["status"] not in ("Confirmed", "Entered", "Invoiced"):
+        return None, False
 
     sales_lines = conn.execute(
         """
@@ -673,6 +675,172 @@ def insert_po_lines(conn, purchase_order_id, selected_lines):
                 line["total_inc_gst"],
             ),
         )
+
+
+def sales_product_options(conn, selected_id=None):
+    rows = conn.execute(
+        """
+        SELECT id, sku, name, size, sell_price
+        FROM products
+        WHERE active = 1 OR id = ?
+        ORDER BY sku
+        """,
+        (selected_id or 0,),
+    ).fetchall()
+    opts = ['<option value="">Select product</option>']
+    for r in rows:
+        description = invoice_description(r["name"], r["size"])
+        selected = "selected" if str(r["id"]) == str(selected_id or "") else ""
+        opts.append(
+            f'<option value="{esc(r["id"])}" {selected} '
+            f'data-code="{esc(r["sku"])}" '
+            f'data-description="{esc(description)}" '
+            f'data-price="{esc(r["sell_price"])}">'
+            f'{esc(r["sku"])} - {esc(description)}</option>'
+        )
+    return "".join(opts)
+
+
+def sales_line_form_rows(conn, existing_lines=None, max_lines=8):
+    existing_lines = list(existing_lines or [])
+    rows = ""
+    for i in range(1, max_lines + 1):
+        line = existing_lines[i - 1] if i <= len(existing_lines) else None
+        product_opts = sales_product_options(conn, line["product_id"] if line else None)
+        rows += f"""
+        <div class="sales-line-entry">
+          <label>Product<select name="sales_product_{i}" data-sales-product>{product_opts}</select></label>
+          <label>Code<input data-sales-code readonly value="{esc(line["product_code"] if line else "")}"></label>
+          <label>Description<input data-sales-description readonly value="{esc(line["description"] if line else "")}"></label>
+          <label>Qty cartons<input name="sales_qty_{i}" type="number" min="0" step="1" data-sales-qty value="{esc(line["qty_cartons"] if line else "")}"></label>
+          <label>Sell/carton<input name="sales_price_{i}" type="number" min="0" step="0.01" data-sales-price value="{esc(line["sell_price"] if line else "")}"></label>
+          <label>Revenue<input data-sales-revenue readonly value="{money(line["revenue"]) if line else ""}"></label>
+        </div>
+        """
+    return rows
+
+
+SALES_FORM_SCRIPT = """
+          <script>
+            const salesMoneyFormat = new Intl.NumberFormat("en-AU", { style: "currency", currency: "AUD" });
+            const updateSalesTotal = () => {
+              let total = 0;
+              document.querySelectorAll(".sales-line-entry").forEach((row) => {
+                const qty = Number.parseFloat(row.querySelector("[data-sales-qty]").value || "0");
+                const price = Number.parseFloat(row.querySelector("[data-sales-price]").value || "0");
+                const revenue = qty * price;
+                row.querySelector("[data-sales-revenue]").value = revenue ? salesMoneyFormat.format(revenue) : "";
+                total += revenue;
+              });
+              const totalEl = document.querySelector("[data-sales-live-total]");
+              if (totalEl) totalEl.textContent = salesMoneyFormat.format(total);
+            };
+            document.querySelectorAll("[data-sales-product]").forEach((select) => {
+              select.addEventListener("change", () => {
+                const row = select.closest(".sales-line-entry");
+                const option = select.selectedOptions[0];
+                row.querySelector("[data-sales-code]").value = option.dataset.code || "";
+                row.querySelector("[data-sales-description]").value = option.dataset.description || "";
+                row.querySelector("[data-sales-price]").value = option.dataset.price || "";
+                updateSalesTotal();
+              });
+            });
+            document.querySelectorAll("[data-sales-qty], [data-sales-price]").forEach((input) => {
+              input.addEventListener("input", updateSalesTotal);
+            });
+            updateSalesTotal();
+          </script>
+"""
+
+
+def parse_sales_lines(conn, form_data, max_lines=8):
+    selected_lines = []
+    revenue_total = 0.0
+    for i in range(1, max_lines + 1):
+        product_id = form_data.get(f"sales_product_{i}")
+        qty = int(float(form_data.get(f"sales_qty_{i}") or 0))
+        sell_price = float(form_data.get(f"sales_price_{i}") or 0)
+        if not product_id or qty <= 0:
+            continue
+        product = conn.execute("SELECT * FROM products WHERE id = ?", (product_id,)).fetchone()
+        if not product:
+            continue
+        revenue = qty * sell_price
+        selected_lines.append(
+            {
+                "product_id": int(product_id),
+                "product_code": product["sku"],
+                "description": invoice_description(product["name"], product["size"]),
+                "qty_cartons": qty,
+                "sell_price": sell_price,
+                "cost_price": 0.0,
+                "revenue": revenue,
+                "cost": 0.0,
+                "gross_profit": revenue,
+            }
+        )
+        revenue_total += revenue
+    return selected_lines, revenue_total
+
+
+def insert_sales_lines(conn, order_id, selected_lines):
+    for line in selected_lines:
+        conn.execute(
+            """
+            INSERT INTO sales_lines
+            (order_id, product_id, qty_cartons, sell_price, cost_price, revenue, cost, gross_profit)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                order_id,
+                line["product_id"],
+                line["qty_cartons"],
+                line["sell_price"],
+                line["cost_price"],
+                line["revenue"],
+                line["cost"],
+                line["gross_profit"],
+            ),
+        )
+
+
+def sales_stock_shortages(conn, sales_lines):
+    required = {}
+    for line in sales_lines:
+        required[line["product_id"]] = required.get(line["product_id"], 0) + int(line["qty_cartons"] or 0)
+    shortages = []
+    for product_id, qty in required.items():
+        row = conn.execute(
+            """
+            SELECT p.sku, p.name, COALESCE(SUM(l.remaining_cartons), 0) AS available
+            FROM products p
+            LEFT JOIN purchase_lines l ON l.product_id = p.id
+            WHERE p.id = ?
+            GROUP BY p.id, p.sku, p.name
+            """,
+            (product_id,),
+        ).fetchone()
+        available = float(row["available"] or 0) if row else 0.0
+        if qty > available:
+            label = f'{row["sku"]} - {row["name"]}' if row else f"Product {product_id}"
+            shortages.append(f"{label}: need {qty:g}, available {available:g}")
+    return shortages
+
+
+def refresh_product_inventory_from_batches(conn, product_id):
+    row = conn.execute(
+        """
+        SELECT COALESCE(SUM(remaining_cartons), 0) AS qty,
+               COALESCE(SUM(remaining_cartons * landed_unit_cost), 0) AS value
+        FROM purchase_lines
+        WHERE product_id = ?
+        """,
+        (product_id,),
+    ).fetchone()
+    stock_qty = float(row["qty"] or 0)
+    avg_cost = (float(row["value"] or 0) / stock_qty) if stock_qty else 0.0
+    conn.execute("UPDATE products SET stock_qty = ?, avg_cost = ? WHERE id = ?", (stock_qty, avg_cost, product_id))
+    return stock_qty, avg_cost
 
 
 def product_inventory_baseline(conn, product_id):
