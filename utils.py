@@ -962,6 +962,12 @@ def company_invoice_html(company):
     return "".join(company_lines)
 
 
+def payment_instruction_lines(value):
+    lines = split_address_lines(value)
+    filtered = [line for line in lines if not line.lower().startswith("payment terms:")]
+    return "\n".join(filtered)
+
+
 def product_by_id():
     return {product["id"]: product for product in PUBLIC_PRODUCTS}
 

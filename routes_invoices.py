@@ -276,10 +276,12 @@ class InvoiceRoutesMixin:
         company_block = company_invoice_html(company)
         bill_to_block = invoice_address_html(customer_name, bill_to)
         ship_to_block = invoice_address_html(customer_name, ship_to)
-        payment_terms = (
-            invoice["notes"]
-            if invoice["notes"] == "Payment due within 7 days of invoice date."
-            else f"Due by {display_date(invoice['due_date'])}"
+        payment_terms = f"Due by {display_date(invoice['due_date'])}"
+        payment_instructions = payment_instruction_lines(company["payment_instructions"])
+        payment_instructions_html = (
+            f'<p class="invoice-payment-instructions">{esc(payment_instructions)}</p>'
+            if payment_instructions
+            else ""
         )
         body = f"""
         <section class="invoice-page">
@@ -347,7 +349,7 @@ class InvoiceRoutesMixin:
                 <p><span>Payment reference</span><strong>{esc(invoice["invoice_number"])}</strong></p>
                 <p><span>Payment terms</span><strong>{esc(payment_terms)}</strong></p>
               </div>
-              <p class="invoice-payment-instructions">{esc(company["payment_instructions"])}</p>
+              {payment_instructions_html}
             </section>
             <footer class="invoice-print-footer">Invoice {esc(invoice["invoice_number"])} &middot; Due {esc(display_date(invoice["due_date"]))} &middot; Balance {money(invoice["balance_due"])}</footer>
           </div>
