@@ -14,13 +14,14 @@ class AdminRoutesMixin:
         if self.command == "POST":
             f = self.form()
             if f.get("username") == ADMIN_USER and f.get("password") == ADMIN_PASSWORD:
-                cookie = f"cupflow_session={sign('admin')}; HttpOnly; SameSite=Lax; Path=/"
+                secure = "; Secure" if os.environ.get("DATABASE_URL") else ""
+                cookie = f"cupflow_session={sign('admin')}; HttpOnly; SameSite=Strict; Path=/{secure}"
                 self.send_response(303)
                 self.send_header("Location", "/admin")
                 self.send_header("Set-Cookie", cookie)
                 self.end_headers()
                 return
-            error = '<p class="alert">Invalid login. Try admin / admin123 for local demo.</p>'
+            error = '<p class="alert">Invalid username or password.</p>'
         else:
             error = ""
         body = f"""
@@ -28,7 +29,8 @@ class AdminRoutesMixin:
           <h1>Admin Login</h1>
           {error}
           <form method="post" class="form">
-            <label>Username<input name="username" required value="admin"></label>
+            {self.csrf_input()}
+            <label>Username<input name="username" required></label>
             <label>Password<input name="password" type="password" required></label>
             <button class="button primary" type="submit">Login</button>
           </form>
@@ -37,9 +39,10 @@ class AdminRoutesMixin:
         self.respond(layout("Admin Login", body, False, noindex=True))
 
     def logout(self):
+        secure = "; Secure" if os.environ.get("DATABASE_URL") else ""
         self.respond(
             layout("Logged out", '<section class="panel narrow"><h1>Logged out</h1><a class="button" href="/">Home</a></section>', noindex=True),
-            cookies=["cupflow_session=; Max-Age=0; Path=/"],
+            cookies=[f"cupflow_session=; Max-Age=0; HttpOnly; SameSite=Strict; Path=/{secure}"],
         )
 
     def admin(self):
@@ -152,6 +155,7 @@ class AdminRoutesMixin:
                 (
                     f'<a class="mini-quote" href="/admin/suppliers?edit={esc(r["id"])}">Edit</a> '
                     f'<form method="post" class="inline-form" onsubmit="return confirm(\'Deactivate this supplier? Existing purchase history will be preserved.\')">'
+                    f'{self.csrf_input()}'
                     f'<input type="hidden" name="action" value="deactivate">'
                     f'<input type="hidden" name="supplier_id" value="{esc(r["id"])}">'
                     f'<button class="link-button" type="submit">Deactivate</button></form>'
@@ -174,6 +178,7 @@ class AdminRoutesMixin:
           <h2>{form_title}</h2>
           <form method="post" class="form grid-form">
             {hidden_id}
+            {self.csrf_input()}
             <label>Supplier code<input name="supplier_code" required value="{supplier_value("supplier_code")}"></label>
             <label>Supplier name<input name="supplier_name" required value="{supplier_value("supplier_name")}"></label>
             <label>ABN<input name="abn" value="{supplier_value("abn")}"></label>
@@ -247,6 +252,7 @@ class AdminRoutesMixin:
         {error}
         <section class="panel">
           <form method="post" class="form grid-form">
+            {self.csrf_input()}
             <label>Company name<input name="company_name" required value="{esc(c["company_name"])}"></label>
             <label>ABN<input name="abn" value="{esc(c["abn"])}"></label>
             <label>Phone<input name="phone" value="{esc(c["phone"])}"></label>

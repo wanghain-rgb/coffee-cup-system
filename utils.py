@@ -131,6 +131,11 @@ def verify(signed):
     return value if hmac.compare_digest(digest, expected) else None
 
 
+def make_csrf_token(session_sig):
+    digest = hmac.new(SECRET.encode(), f"csrf:{session_sig}".encode(), "sha256").hexdigest()
+    return digest[:32]
+
+
 def layout(title, body, authed=False, noindex=False):
     admin_links = ""
     if authed:

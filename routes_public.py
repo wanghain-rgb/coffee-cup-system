@@ -274,6 +274,7 @@ Sitemap: {SITE_URL}/sitemap.xml
             <p class="final-price-note">Final price will be confirmed based on quantity, delivery area and availability.</p>
           </div>
           <form method="post" class="form quote-form">
+            {self.csrf_input()}
             <input type="hidden" name="items" value="{esc(items_value)}">
             <textarea hidden name="product_interest">{esc(summary_text)}</textarea>
             <textarea hidden name="order_summary">{esc(summary_text)}</textarea>

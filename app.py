@@ -24,6 +24,10 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
     def route(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        if self.command == "POST":
+            form_data = self.form()
+            if not hmac.compare_digest(form_data.get("_csrf", ""), self.csrf_token()):
+                return self.respond("Invalid request. Please go back and try again.", 403, content_type="text/plain")
         if path.startswith("/static/"):
             return self.static_file(path)
         if path.startswith("/admin/invoices/"):
@@ -96,9 +100,22 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         return False
 
     def form(self):
-        length = int(self.headers.get("Content-Length", "0"))
-        data = self.rfile.read(length).decode("utf-8") if length else ""
-        return {k: v[0].strip() for k, v in parse_qs(data).items()}
+        if not hasattr(self, "_cached_form"):
+            length = int(self.headers.get("Content-Length", "0"))
+            data = self.rfile.read(length).decode("utf-8") if length else ""
+            self._cached_form = {k: v[0].strip() for k, v in parse_qs(data).items()}
+        return self._cached_form
+
+    def _session_raw(self):
+        cookie = SimpleCookie(self.headers.get("Cookie"))
+        token = cookie.get("cupflow_session")
+        return token.value if token else ""
+
+    def csrf_token(self):
+        return make_csrf_token(self._session_raw())
+
+    def csrf_input(self):
+        return f'<input type="hidden" name="_csrf" value="{self.csrf_token()}">'
 
     def respond(self, content, status=200, content_type="text/html", cookies=None):
         self.send_response(status)
@@ -197,6 +214,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         <section class="panel">
           <h2>Create purchase order</h2>
           <form method="post" class="form invoice-form">
+            {self.csrf_input()}
             <div class="quote-detail-grid">
               <label>Supplier<select name="supplier_id" required>{supplier_opts}</select></label>
               <label>Order date<input name="order_date" type="date" value="{today}" required></label>
@@ -255,10 +273,12 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
             actions = f"""
             <div class="form-actions">
               <form method="post" action="/admin/purchase-orders/{po_id}/confirm" onsubmit="return confirm('Confirm this purchase order and update inventory? This can only be done once.')">
+                {self.csrf_input()}
                 <button class="button primary" type="submit">Confirm PO</button>
               </form>
               <a class="button secondary" href="/admin/purchase-orders/{po_id}/edit">Edit</a>
               <form method="post" action="/admin/purchase-orders/{po_id}/delete" onsubmit="return confirm('Delete this draft purchase order?')">
+                {self.csrf_input()}
                 <button class="link-button" type="submit">Delete</button>
               </form>
             </div>
@@ -341,6 +361,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         {error}
         <section class="panel">
           <form method="post" class="form invoice-form">
+            {self.csrf_input()}
             <div class="quote-detail-grid">
               <label>Supplier<select name="supplier_id" required>{supplier_opts}</select></label>
               <label>Order date<input name="order_date" type="date" value="{esc(po["order_date"])}" required></label>
@@ -456,6 +477,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         <section class="panel">
           <h2>Add purchase batch</h2>
           <form method="post" class="form grid-form">
+            {self.csrf_input()}
             <label>Supplier<input name="supplier" required></label>
             <label>Invoice no<input name="invoice_no"></label>
             <label>Date<input name="batch_date" type="date" required></label>
@@ -572,6 +594,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         <section class="panel">
           <h2>Add sales order</h2>
           <form method="post" class="form invoice-form">
+            {self.csrf_input()}
             <div class="quote-detail-grid">
               <label>Customer<select name="customer_id" required>{customer_opts}</select></label>
               <label>Date<input name="order_date" type="date" value="{date.today().isoformat()}" required></label>
@@ -665,6 +688,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
             actions = f"""
             <div class="form-actions">
               <form method="post" action="/admin/sales/{esc(order_id)}/confirm" onsubmit="return confirm('Confirm this sales order and deduct inventory? This can only be done once.')">
+                {self.csrf_input()}
                 <button class="button primary" type="submit">Confirm Order</button>
               </form>
               <p class="help-text">Inventory is not deducted until the order is confirmed.</p>
@@ -673,6 +697,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         else:
             actions = f"""
             <form method="post" action="/admin/sales/{esc(order_id)}/issue-invoice" class="form-actions">
+              {self.csrf_input()}
               <button class="button primary" type="submit">Issue Invoice</button>
             </form>
             """
@@ -808,10 +833,7 @@ def main():
     host = "0.0.0.0"
     server = ThreadingHTTPServer((host, port), App)
     print(f"{APP_NAME} running at http://{host}:{port}")
-    print("Admin login: admin / admin123")
     server.serve_forever()
 
-if __name__ == "__main__":
-    main()
 if __name__ == "__main__":
     main()

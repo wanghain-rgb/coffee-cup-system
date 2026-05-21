@@ -116,6 +116,7 @@ class ProductRoutesMixin:
                 (
                     f'<a class="mini-quote" href="/admin/products?edit={esc(r["id"])}">Edit</a> '
                     f'<form method="post" class="inline-form" onsubmit="return confirm(\'Are you sure you want to deactivate this product? Existing historical records will be preserved.\')">'
+                    f'{self.csrf_input()}'
                     f'<input type="hidden" name="action" value="deactivate">'
                     f'<input type="hidden" name="product_id" value="{esc(r["id"])}">'
                     f'<button class="link-button" type="submit">Delete</button></form>'
@@ -152,6 +153,7 @@ class ProductRoutesMixin:
           <p class="help-text">Recommended product code format: CUP-08-SW-001, CUP-12-SW-001, CUP-16-SW-001, CUP-08-DW-001, LID-90-PL-001, BAG-SM-KR-001, NAP-WH-001, STR-BK-001. Meaning: Category - Size - Type/Material - Sequence. Examples: CUP = Coffee Cup, SW = Single Wall, DW = Double Wall, LID = Lid, PL = Plastic, BAG = Bag, NAP = Napkin, STR = Straw.</p>
           <form method="post" class="form grid-form">
             {hidden_id}
+            {self.csrf_input()}
             <label>Product code<input name="sku" required value="{esc(product_value("sku"))}"></label>
             <label>Name<input name="name" required value="{esc(product_value("name"))}"></label>
             <label>Size<input name="size" value="{esc(product_value("size"))}"></label>

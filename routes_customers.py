@@ -76,6 +76,7 @@ class CustomerRoutesMixin:
           <h2>{form_title}</h2>
           <form method="post" class="form grid-form">
             {hidden_id}
+            {self.csrf_input()}
             <label>Business name<input name="business_name" required value="{esc(c["business_name"] if c else "")}"></label>
             <label>ABN<input name="abn" value="{esc(c["abn"] if c else "")}"></label>
             <label>Contact person<input name="contact_name" value="{esc(c["contact_name"] if c else "")}"></label>

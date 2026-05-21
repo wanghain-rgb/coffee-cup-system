@@ -85,6 +85,7 @@ class InvoiceRoutesMixin:
                     f'<a class="mini-quote" href="/admin/invoices/{esc(r["id"])}">View / Print</a>'
                     f'<a class="mini-quote" href="/admin/invoices/{esc(r["id"])}/edit">Edit</a>'
                     f'<form method="post" action="/admin/invoices/{esc(r["id"])}/delete" class="inline-form" onsubmit="return confirm(\'Delete invoice {esc(r["invoice_number"])}? This cannot be undone.\')">'
+                    f'{self.csrf_input()}'
                     f'<button class="link-button" type="submit">Delete</button></form>'
                     f'</div>'
                 ),
@@ -98,6 +99,7 @@ class InvoiceRoutesMixin:
         <section class="panel">
           <h2>Create invoice</h2>
           <form method="post" class="form invoice-form">
+            {self.csrf_input()}
             <div class="quote-detail-grid">
               <label>Customer<select name="customer_id" required>{customer_opts}</select></label>
               <label>Issue date<input name="issue_date" type="date" value="{today.isoformat()}" required></label>
@@ -186,6 +188,7 @@ class InvoiceRoutesMixin:
         {error}
         <section class="panel">
           <form method="post" class="form invoice-form">
+            {self.csrf_input()}
             <div class="quote-detail-grid">
               <label>Customer<select name="customer_id" required>{customer_opts}</select></label>
               <label>Issue date<input name="issue_date" type="date" value="{esc(invoice["issue_date"])}" required></label>
