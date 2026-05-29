@@ -2,7 +2,7 @@ from email.message import EmailMessage
 import os
 import smtplib
 
-from utils import esc, money
+from utils import PUBLIC_EMAIL, PUBLIC_PHONE_DISPLAY, esc, money
 
 def quotation_email_lines(selected):
     lines = []
@@ -88,9 +88,9 @@ Valid for 7 days.
 This is an indicative quotation. Final price is subject to stock availability, delivery area and order confirmation.
 
 Contact:
-Stone Wang
-0497278099
-info@aureapackaging.com.au
+AUREA Packaging Supply Pty Ltd
+{PUBLIC_PHONE_DISPLAY}
+{PUBLIC_EMAIL}
 
 We will contact you shortly to confirm delivery and final details.
 """
@@ -105,7 +105,7 @@ We will contact you shortly to confirm delivery and final details.
       <h2>Total amount: {money(total)}</h2>
       <p><strong>Valid for 7 days.</strong></p>
       <p>This is an indicative quotation. Final price is subject to stock availability, delivery area and order confirmation.</p>
-      <p><strong>Contact</strong><br>Stone Wang<br>0497278099<br>info@aureapackaging.com.au</p>
+      <p><strong>Contact</strong><br>AUREA Packaging Supply Pty Ltd<br>{esc(PUBLIC_PHONE_DISPLAY)}<br>{esc(PUBLIC_EMAIL)}</p>
       <p>We will contact you shortly to confirm delivery and final details.</p>
     </div>
     """

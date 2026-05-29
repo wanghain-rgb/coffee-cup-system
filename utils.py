@@ -11,12 +11,50 @@ SECRET = os.environ.get("CUPFLOW_SECRET", "change-this-local-dev-secret")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 SITE_URL = "https://aureapackaging.com.au"
-SEO_TITLE = "Premium Coffee Cups & Packaging Supplies Melbourne | AUREA Packaging"
+PUBLIC_PHONE_DISPLAY = "0497 278 099"
+PUBLIC_PHONE_TEL = "0497278099"
+PUBLIC_EMAIL = "qiuchen.wang@bilinstone.com"
+PUBLIC_WEBSITE = "www.aureapackaging.com.au"
+PUBLIC_LOCATION = "Melbourne, Australia"
+SEO_TITLE = "Sustainable Packaging Supply Melbourne | AUREA Packaging"
 SEO_DESCRIPTION = (
-    "Bulk coffee cups, lids, takeaway packaging and cafe supplies in Melbourne. "
-    "Fast delivery, reliable supply and competitive pricing for cafes and takeaway shops."
+    "Factory-direct sustainable food packaging, coffee cups, bags, containers and custom packaging "
+    "for Australian foodservice, retail and hospitality businesses."
 )
 SEO_IMAGE = f"{SITE_URL}/static/hero-cups.png"
+PRODUCT_RANGE = [
+    ("Paper cups", "Single/double/ripple wall, PLA or PE, 3-44oz, compostable options"),
+    ("Soup & salad bowls", "6-50oz, kraft and white, paper/PP/PET/PLA lids"),
+    ("Take-out boxes", "Folded kraft, 650-2400ml, microwave-safe, tab-lock"),
+    ("Food trays", "Boat trays, sushi trays, multi-compartment and kraft options"),
+    ("Plastic containers", "PP, PET, rPET, CPLA, CPET, hinged and clamshell formats"),
+    ("Sugarcane tableware", "Plates, bowls and clamshells, 100% compostable options"),
+    ("Cutlery", "CPLA, birch wood, bamboo, paper, chopsticks and kits"),
+    ("Eco straws", "Paper, PLA, PHA, sugarcane, reusable stainless/glass"),
+    ("Paper bags", "Kraft and recycled, twisted/flat/die-cut/no-handle options"),
+    ("Cup carriers", "1-4 cup carriers, recycled fibre and compostable options"),
+    ("Napkins", "Kraft, white, 1-ply/2-ply, lunch and dinner sizes"),
+    ("Sushi boxes", "PET, rPET and PLA, compartment options and clear lids"),
+    ("Labels & stickers", "Paper, kraft and PP, custom shapes and food-safe adhesives"),
+    ("Kitchen wipes", "Viscose and polyester blend, super absorbent, reusable or disposable"),
+    ("Flat bags", "Kraft, HDPE and PLA in various food-grade sizes"),
+    ("Wraps", "Cling film, baking paper, aluminium foil and catering foil"),
+    ("PET cold cups", "Clear PET cold cups and lids, recyclable flat or dome lids"),
+]
+CERTIFICATIONS = [
+    ("BRCGS B+ (China)", "SGS, valid Oct 2026"),
+    ("BRCGS (Thailand)", "Global packaging materials standard"),
+    ("FSC Certified", "Responsible sourcing at both factories"),
+    ("ISO 9001", "Quality management at both factories"),
+    ("amfori BSCI", "Social compliance at both factories"),
+    ("Sedex / SMETA", "Ethical trade audit"),
+    ("BPI Compostable", "Thailand bagasse and PLA products"),
+    ("USDA BioPreferred", "Bio-based programme"),
+    ("FDA Compliant", "Food contact safety"),
+    ("EU 10/2011", "Food contact plastics"),
+    ("GRS / rPET", "Global Recycled Standard"),
+    ("OK Compost HOME", "TUV Austria home compost"),
+]
 PUBLIC_PRODUCTS = [
     {
         "id": "SW8",
@@ -175,14 +213,14 @@ def layout(title, body, authed=False, noindex=False):
         "@type": "LocalBusiness",
         "name": "AUREA Packaging Supply Pty Ltd",
         "url": "{SITE_URL}/",
-        "email": "info@aureapackaging.com.au",
-        "telephone": "0497278099",
+        "email": "{PUBLIC_EMAIL}",
+        "telephone": "{PUBLIC_PHONE_TEL}",
         "address": {{
           "@type": "PostalAddress",
           "addressLocality": "Melbourne",
           "addressCountry": "AU"
         }},
-        "description": "Supplier of coffee cups, lids and takeaway packaging products for cafes and food businesses in Melbourne and across Australia."
+        "description": "Factory-direct sustainable packaging supplier for foodservice, retail and hospitality businesses in Australia."
       }}</script>"""
     return f"""<!doctype html>
     <html lang="en">
@@ -203,14 +241,16 @@ def layout(title, body, authed=False, noindex=False):
           <span><strong>AUREA</strong><small>Packaging Supply Pty Ltd</small></span>
         </a>
         <nav>
-          <a href="/">View Products</a>
+          <a href="/#products">Products</a>
+          <a href="/#range">Range</a>
+          <a href="/#certifications">Certifications</a>
           <a href="/#contact">Contact Us</a>
           <a class="nav-cta" href="/quote">Request Quote</a>
           {admin_links}
         </nav>
       </header>
       <main>{body}</main>
-      <footer>AUREA Packaging Supply Pty Ltd &middot; Melbourne, Australia &middot; info@aureapackaging.com.au</footer>
+      <footer>AUREA Packaging Supply Pty Ltd &middot; {PUBLIC_LOCATION} &middot; {PUBLIC_EMAIL}</footer>
     </body>
     </html>"""
 
@@ -993,10 +1033,9 @@ def quick_order_rows():
             <p class="qo-card__size">{esc(product["size"])}</p>
             <p class="qo-card__carton">{esc(product["carton"])} &middot; {esc(product["lid"])}</p>
           </div>
-          <div class="qo-card__price">
-            <span>From</span>
-            <strong>{money(product["quote_price"])}</strong>
-            <span>/ box</span>
+          <div class="qo-card__price qo-card__price--hidden" aria-label="Price confirmed after enquiry">
+            <strong>Price after enquiry</strong>
+            <span>Submit quantities and details to receive pricing.</span>
           </div>
           <div class="qo-card__inputs">
             <label class="qo-card__label">
@@ -1059,7 +1098,7 @@ def quick_order_table(selected):
         <div class="quote-empty">
           <strong>No products selected yet.</strong>
           <p>Please choose at least one product from Quick Order so we can prepare the right final price.</p>
-          <a class="button primary" href="/#quick-order">Choose Products</a>
+          <a class="button primary" href="/#products">Choose Products</a>
         </div>
         """
     rows = ""
@@ -1188,13 +1227,13 @@ def quotation_page(quote_number, quote_date, form_data, selected, email_sent=Fal
             <p>Confirm your order enquiry or speak with us directly so we can lock in availability and final pricing.</p>
           </div>
           <div class="quotation-next-actions">
-            <a class="button primary" href="mailto:stone.wang@aureapackaging.com.au?subject=Confirm%20Quotation%20{esc(quote_number)}">Confirm This Order</a>
-            <a class="button ghost" href="mailto:stone.wang@aureapackaging.com.au">Contact Us</a>
-            <a class="button ghost" href="tel:0412345678">Call Now</a>
+            <a class="button primary" href="mailto:{PUBLIC_EMAIL}?subject=Confirm%20Quotation%20{esc(quote_number)}">Confirm This Order</a>
+            <a class="button ghost" href="mailto:{PUBLIC_EMAIL}">Contact Us</a>
+            <a class="button ghost" href="tel:{PUBLIC_PHONE_TEL}">Call Now</a>
           </div>
           <div class="quotation-contact">
-            <a href="tel:0412345678">0412 345 678</a>
-            <a href="mailto:stone.wang@aureapackaging.com.au">stone.wang@aureapackaging.com.au</a>
+            <a href="tel:{PUBLIC_PHONE_TEL}">{PUBLIC_PHONE_DISPLAY}</a>
+            <a href="mailto:{PUBLIC_EMAIL}">{PUBLIC_EMAIL}</a>
           </div>
         </section>
       </div>

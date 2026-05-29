@@ -5,6 +5,31 @@ from db import db
 from email_utils import send_quotation_emails
 from utils import *
 
+
+def range_icon_svg(name):
+    icons = {
+        "Paper cups": '<path d="M18 15h28l-4 40H22z"/><path d="M16 15h32"/><path d="M22 26h20"/>',
+        "Soup & salad bowls": '<path d="M14 27h36"/><path d="M18 28c2 13 8 20 14 20s12-7 14-20"/><path d="M21 22c7-4 19-4 26 0"/>',
+        "Take-out boxes": '<path d="M18 25l8-8h20l8 8-5 28H23z"/><path d="M26 17l6 10h14l-8-10"/><path d="M23 25h26"/>',
+        "Food trays": '<path d="M15 37l9-14h28l-6 24H20z"/><path d="M23 29h20"/><path d="M28 25l-2 13"/>',
+        "Plastic containers": '<path d="M18 25h32l-3 24H21z"/><path d="M14 21h40v6H14z"/><path d="M24 31h20"/>',
+        "Sugarcane tableware": '<circle cx="34" cy="34" r="18"/><circle cx="34" cy="34" r="10"/>',
+        "Cutlery": '<path d="M20 14v40"/><path d="M16 14v14M20 14v14M24 14v14"/><path d="M34 14v40"/><path d="M44 14c7 7 7 17 0 24v16"/>',
+        "Eco straws": '<path d="M24 54l14-40"/><path d="M38 54l14-40"/><path d="M44 14h10"/><path d="M30 14h10"/>',
+        "Paper bags": '<path d="M20 25h28v29H20z"/><path d="M26 25c0-8 16-8 16 0"/><path d="M42 54l6-7"/>',
+        "Cup carriers": '<path d="M16 28h36l-6 18H22z"/><circle cx="27" cy="34" r="5"/><circle cx="41" cy="34" r="5"/><path d="M22 46v8M46 46v8"/>',
+        "Napkins": '<path d="M20 22h25v25H20z"/><path d="M24 18h25v25"/><path d="M28 14h25v25"/>',
+        "Sushi boxes": '<rect x="17" y="18" width="34" height="32" rx="4"/><circle cx="27" cy="29" r="4"/><circle cx="40" cy="29" r="4"/><circle cx="27" cy="41" r="4"/><circle cx="40" cy="41" r="4"/>',
+        "Labels & stickers": '<path d="M18 18h24v32H18z"/><path d="M42 30h10v20H42z"/><circle cx="30" cy="31" r="6"/>',
+        "Kitchen wipes": '<path d="M18 27c9-9 22 9 32 0v24c-10 9-23-9-32 0z"/><path d="M25 36l18 5"/>',
+        "Flat bags": '<path d="M21 16h24v38H21z"/><path d="M29 20h24v38H29z"/>',
+        "Wraps": '<path d="M15 38c0-8 8-14 18-14s18 6 18 14-8 14-18 14-18-6-18-14z"/><path d="M33 24v28"/><path d="M51 38h8"/>',
+        "PET cold cups": '<path d="M22 22h24l-4 32H26z"/><path d="M18 20h32"/><path d="M28 14h12l4 6"/><path d="M34 14v-6"/>',
+    }
+    icon = icons.get(name, '<path d="M18 20h32v30H18z"/><path d="M24 28h20"/>')
+    return f'<span class="range-icon" aria-hidden="true"><svg viewBox="0 0 68 68" focusable="false">{icon}</svg></span>'
+
+
 class PublicRoutesMixin:
     def robots_txt(self):
         content = f"""User-agent: *
@@ -25,88 +50,200 @@ Sitemap: {SITE_URL}/sitemap.xml
 
     def catalogue(self):
         quick_rows = quick_order_rows()
-        # Build product showcase cards from PUBLIC_PRODUCTS
-        showcase_cards = ""
-        for product in PUBLIC_PRODUCTS:
-            showcase_cards += f"""
-            <article class="pub-product-card">
-              <div class="pub-product-img-wrap">
-                <img src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
+        range_cards = ""
+        for name, detail in PRODUCT_RANGE:
+            range_cards += f"""
+            <article class="range-card">
+              {range_icon_svg(name)}
+              <div>
+                <h3>{esc(name)}</h3>
+                <p>{esc(detail)}</p>
+                <strong>Both factories</strong>
               </div>
-              <div class="pub-product-body">
-                <p class="pub-product-type">{esc(product["type"])}</p>
-                <h3 class="pub-product-name">{esc(product["name"])}</h3>
-                <div class="pub-product-specs">
-                  <span><strong>{esc(product["size"])}</strong></span>
-                  <span>{esc(product["carton"])}</span>
-                  <span>{esc(product["lid"])}</span>
-                </div>
-                <div class="pub-product-price">
-                  <span class="pub-price-from">From</span>
-                  <strong class="pub-price-value">{money(product["quote_price"])}</strong>
-                  <span class="pub-price-unit">/ box</span>
-                </div>
+            </article>
+            """
+        certification_cards = ""
+        for name, detail in CERTIFICATIONS:
+            certification_cards += f"""
+            <article class="cert-card">
+              <span>&#10003;</span>
+              <div>
+                <h3>{esc(name)}</h3>
+                <p>{esc(detail)}</p>
               </div>
-              <a class="button primary pub-product-cta" href="#quick-order">Add to Order</a>
             </article>
             """
         body = f"""
-        <section class="hero">
-          <div class="hero-copy">
-            <p class="eyebrow">AUREA Packaging Supply Pty Ltd &mdash; Melbourne</p>
-            <h1>Premium Coffee Cups &amp; Packaging for Cafes</h1>
-            <p>Fast delivery across Melbourne. Best pricing based on quantity.</p>
-            <ul class="hero-trust">
-              <li><span>&#10003;</span>Bulk pricing for cafes &amp; takeaway shops</li>
-              <li><span>&#10003;</span>Fast delivery across Melbourne</li>
-              <li><span>&#10003;</span>Kraft cups, lids and packaging in stock</li>
-            </ul>
-            <div class="hero-actions">
-              <a class="button primary" href="#quick-order">Get Best Price Now</a>
-              <a class="button ghost" href="#contact">Contact Us</a>
+        <section class="hero hero-carousel" aria-label="AUREA packaging highlights">
+          <div class="hero-slide is-active" data-hero-slide style="--hero-image: url('/static/hero-warehouse-supply.png')">
+            <div class="hero-copy">
+              <p class="eyebrow">Manufacturer + Direct Sales</p>
+              <h1>Full product range from both factories</h1>
+              <p>Paper cups, bowls, take-out boxes, bags, labels and sustainable packaging for every business.</p>
+              <div class="hero-actions">
+                <a class="button primary" href="#products">Request a Quote</a>
+                <a class="button ghost" href="#range">View Range</a>
+              </div>
             </div>
           </div>
+          <div class="hero-slide" data-hero-slide style="--hero-image: url('/static/hero-logistics-delivery.png')">
+            <div class="hero-copy">
+              <p class="eyebrow">AU Local Warehouse</p>
+              <h1>Local stock. Same-week dispatch.</h1>
+              <p>Factory-direct pricing with Australian warehouse speed and replenishment planning support.</p>
+              <div class="hero-actions">
+                <a class="button primary" href="#products">Plan Supply</a>
+                <a class="button ghost" href="#contact">Delivery Enquiry</a>
+              </div>
+            </div>
+          </div>
+          <div class="hero-slide" data-hero-slide style="--hero-image: url('/static/hero-cafe-cups.png')">
+            <div class="hero-copy">
+              <p class="eyebrow">Paper Cups</p>
+              <h1>Paper cups, lids and cup carriers</h1>
+              <p>Single, double and ripple wall options with PLA or PE materials and custom branding support.</p>
+              <div class="hero-actions">
+                <a class="button primary" href="#products">Shop Cafe SKUs</a>
+                <a class="button ghost" href="#contact">Ask for Samples</a>
+              </div>
+            </div>
+          </div>
+          <div class="hero-slide" data-hero-slide style="--hero-image: url('/static/hero-restaurant-takeaway.png')">
+            <div class="hero-copy">
+              <p class="eyebrow">Take-out Packaging</p>
+              <h1>Bowls, take-out boxes and paper bags</h1>
+              <p>Soup and salad bowls, folded kraft boxes, sugarcane tableware and food-grade bag options.</p>
+              <div class="hero-actions">
+                <a class="button primary" href="#range">Explore Categories</a>
+                <a class="button ghost" href="#certifications">View Certifications</a>
+              </div>
+            </div>
+          </div>
+          <div class="hero-slide" data-hero-slide style="--hero-image: url('/static/hero-design-stickers.png')">
+            <div class="hero-copy">
+              <p class="eyebrow">Free Brand Design</p>
+              <h1>Custom printed cups, labels and sushi boxes</h1>
+              <p>Logo printing, sticker labels, branded napkins and premium packaging artwork support.</p>
+              <div class="hero-actions">
+                <a class="button primary" href="#contact">Start Custom Design</a>
+                <a class="button ghost" href="#range">View Packaging Range</a>
+              </div>
+            </div>
+          </div>
+          <div class="hero-dots" aria-label="Carousel controls">
+            <button type="button" class="is-active" data-hero-dot aria-label="Show packaging range slide"></button>
+            <button type="button" data-hero-dot aria-label="Show logistics delivery slide"></button>
+            <button type="button" data-hero-dot aria-label="Show coffee cups slide"></button>
+            <button type="button" data-hero-dot aria-label="Show takeaway packaging slide"></button>
+            <button type="button" data-hero-dot aria-label="Show custom design and sticker printing slide"></button>
+          </div>
+        </section>
+
+        <section class="brand-strip" aria-label="AUREA supply summary">
+          <strong>Comprehensive packaging supplier</strong>
+          <span>Two factories</span>
+          <span>AU local warehouse</span>
+          <span>Free brand design</span>
+          <span>Certified materials</span>
         </section>
 
         <section class="why-section">
           <article>
-            <span class="feature-icon">&#128666;</span>
-            <strong>Fast Delivery</strong>
-            <span>Melbourne supply for cafes and takeaway businesses with short lead times.</span>
+            <span class="feature-icon">DS</span>
+            <strong>Free Design Service</strong>
+            <span>Brand packaging artwork support with print-ready files.</span>
           </article>
           <article>
-            <span class="feature-icon">&#128176;</span>
-            <strong>Bulk Pricing</strong>
-            <span>Best pricing based on carton quantity. The more you order, the better the rate.</span>
+            <span class="feature-icon">AU</span>
+            <strong>AU Local Warehouse</strong>
+            <span>Popular SKUs held in Australia for faster dispatch.</span>
           </article>
           <article>
-            <span class="feature-icon">&#128230;</span>
-            <strong>Reliable Supply</strong>
-            <span>Consistent kraft cups and lids always in stock for busy takeaway shops.</span>
+            <span class="feature-icon">US</span>
+            <strong>US-Listed Co. Supplier</strong>
+            <span>Business-ready compliance and supply documentation.</span>
           </article>
           <article>
-            <span class="feature-icon">&#127807;</span>
-            <strong>Eco-friendly</strong>
-            <span>Natural kraft paper packaging options with a clean, sustainable look.</span>
+            <span class="feature-icon">FX</span>
+            <strong>Direct from Factory</strong>
+            <span>Own factories, fewer intermediaries and clearer pricing.</span>
           </article>
         </section>
 
-        <section id="products" class="pub-products-section">
-          <div class="section-head">
-            <p class="eyebrow">Our Products</p>
-            <h2>Cafe Packaging Range</h2>
-            <p>Single wall and double wall kraft cups, universal 90mm lids — everything your cafe needs, ordered in bulk at trade prices.</p>
+        <section class="design-service-section">
+          <div>
+            <p class="eyebrow">Free Brand Design</p>
+            <h2>Free brand design for custom packaging</h2>
+            <p>Colour matching, logo placement and dieline support for production-ready packaging.</p>
           </div>
-          <div class="pub-products-grid">
-            {showcase_cards}
+          <aside>
+            <strong>100%</strong>
+            <span>Free for all customers</span>
+          </aside>
+          <div class="design-mini-grid">
+            <article><strong>Brand colour matching</strong><span>Print-ready artwork files</span></article>
+            <article><strong>Logo &amp; typography</strong><span>Unlimited revisions</span></article>
+            <article><strong>Dieline &amp; structural design</strong><span>Zero design fees</span></article>
           </div>
         </section>
 
-        <section id="quick-order" class="qo-section">
+        <section class="factory-cert-grid">
+          <article class="factory-card">
+            <p class="eyebrow">Dual Manufacturing Footprint</p>
+            <h2>China &amp; Thailand, one supply partner</h2>
+            <dl>
+              <div><dt>China &mdash; Anhui Province</dt><dd>BRCGS B+, ISO 9001, FSC, BSCI and Sedex.</dd></div>
+              <div><dt>Thailand &mdash; Chachoengsao</dt><dd>BPI, USDA BioPreferred, BRCGS, FSC, FDA, GRS and OK Compost.</dd></div>
+            </dl>
+            <strong>Same parent company &middot; one contact &middot; supply continuity guaranteed</strong>
+          </article>
+          <article id="certifications" class="cert-section">
+            <p class="eyebrow">Verified Certifications</p>
+            <div class="cert-grid">{certification_cards}</div>
+          </article>
+        </section>
+
+        <section id="range" class="range-section">
           <div class="section-head">
-            <p class="eyebrow">Quick Order</p>
-            <h2>Select Products &amp; Quantities</h2>
-            <p>Enter box quantities for what you need, then submit one enquiry. We confirm your best price within one business day.</p>
+            <p class="eyebrow">Full Product Range</p>
+            <h2>Packaging categories across both factories</h2>
+            <p>From cups and take-out boxes to bags, labels, wraps and compostable tableware, AUREA supports stock supply and custom packaging programs.</p>
+          </div>
+          <div class="range-grid">{range_cards}</div>
+        </section>
+
+        <section class="vision-section">
+          <p class="eyebrow">Our Vision</p>
+          <h2>Making sustainable packaging the easy choice for every business, everywhere</h2>
+          <div class="vision-grid">
+            <article><strong>Sustainable &amp; affordable</strong><span>Factory-direct pricing with certified eco-materials and no green premium.</span></article>
+            <article><strong>Partner, not a vendor</strong><span>Free design, local stock and compliance documents in one relationship.</span></article>
+            <article><strong>Material innovation</strong><span>rPET, CPLA, PHA, water-based coatings and ahead-of-global-regulation options.</span></article>
+            <article><strong>Greener supply chain</strong><span>Certified products, honest claims and built for the long term.</span></article>
+          </div>
+        </section>
+
+        <script>
+          (() => {{
+            const slides = Array.from(document.querySelectorAll("[data-hero-slide]"));
+            const dots = Array.from(document.querySelectorAll("[data-hero-dot]"));
+            if (!slides.length || !dots.length) return;
+            let active = 0;
+            const show = (index) => {{
+              active = (index + slides.length) % slides.length;
+              slides.forEach((slide, slideIndex) => slide.classList.toggle("is-active", slideIndex === active));
+              dots.forEach((dot, dotIndex) => dot.classList.toggle("is-active", dotIndex === active));
+            }};
+            dots.forEach((dot, index) => dot.addEventListener("click", () => show(index)));
+            window.setInterval(() => show(active + 1), 5200);
+          }})();
+        </script>
+
+        <section id="products" class="qo-section">
+          <div class="section-head">
+            <p class="eyebrow">Products &amp; Quick Order</p>
+            <h2>Coffee cup essentials you can quote directly</h2>
+            <p>Review product images and carton details, then enter quantities on the same card. Pricing appears after you submit your enquiry details.</p>
           </div>
           <form class="quick-order-form" action="/quote" method="get">
             <input type="hidden" name="items" id="quick_order_items">
@@ -164,27 +301,17 @@ Sitemap: {SITE_URL}/sitemap.xml
           <div>
             <p class="eyebrow">Contact</p>
             <h2>Talk to AUREA</h2>
-            <p>Send a quick order enquiry or contact us directly for cafe packaging supply in Melbourne.</p>
+            <p>Send a quick order enquiry or contact us directly for sustainable packaging, custom print, samples and stock availability.</p>
           </div>
           <div class="contact-card">
-            <strong>Stone Wang</strong>
-            <a href="tel:0497278099">0497 278 099</a>
-            <a href="mailto:info@aureapackaging.com.au">info@aureapackaging.com.au</a>
-            <span>Melbourne, Australia</span>
+            <strong>AUREA Packaging Supply Pty Ltd</strong>
+            <a href="tel:{PUBLIC_PHONE_TEL}">{PUBLIC_PHONE_DISPLAY}</a>
+            <a href="mailto:{PUBLIC_EMAIL}">{PUBLIC_EMAIL}</a>
+            <a href="https://{PUBLIC_WEBSITE}">{PUBLIC_WEBSITE}</a>
+            <span>{PUBLIC_LOCATION}</span>
           </div>
         </section>
 
-        <section class="final-cta">
-          <div>
-            <p class="eyebrow">Ready to Order?</p>
-            <h2>Ready to stock up your cafe?</h2>
-            <p>Send your product quantities once and we will confirm availability, delivery details and the best final price.</p>
-          </div>
-          <div class="final-cta-actions">
-            <a class="button primary" href="#quick-order">Get Best Price Now</a>
-            <a class="button ghost" href="#contact">Contact Us</a>
-          </div>
-        </section>
         """
         self.respond(layout("Product Catalogue", body, self.is_authed()))
 
@@ -198,7 +325,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                   <div class="quote-empty">
                     <strong>No products selected yet.</strong>
                     <p>Please choose at least one product from Quick Order before submitting an enquiry.</p>
-                    <a class="button primary" href="/#quick-order">Choose Products</a>
+                    <a class="button primary" href="/#products">Choose Products</a>
                   </div>
                 </section>
                 """
