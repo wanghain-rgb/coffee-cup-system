@@ -66,11 +66,8 @@ Sitemap: {SITE_URL}/sitemap.xml
         for name, detail in CERTIFICATIONS:
             certification_cards += f"""
             <article class="cert-card">
-              <span>&#10003;</span>
-              <div>
-                <h3>{esc(name)}</h3>
-                <p>{esc(detail)}</p>
-              </div>
+              <span class="cert-mark">{esc(name)}</span>
+              <p>{esc(detail)}</p>
             </article>
             """
         body = f"""
@@ -148,59 +145,27 @@ Sitemap: {SITE_URL}/sitemap.xml
         </section>
 
         <section class="why-section">
-          <article>
-            <span class="feature-icon">DS</span>
+          <article class="why-card why-card--design">
             <strong>Free Design Service</strong>
-            <span>Brand packaging artwork support with print-ready files.</span>
+            <span>Brand colour matching, logo placement, dieline support and print-ready artwork files.</span>
           </article>
-          <article>
-            <span class="feature-icon">AU</span>
+          <article class="why-card why-card--warehouse">
             <strong>AU Local Warehouse</strong>
             <span>Popular SKUs held in Australia for faster dispatch.</span>
           </article>
-          <article>
-            <span class="feature-icon">US</span>
+          <article class="why-card why-card--compliance">
             <strong>US-Listed Co. Supplier</strong>
             <span>Business-ready compliance and supply documentation.</span>
           </article>
-          <article>
-            <span class="feature-icon">FX</span>
+          <article class="why-card why-card--factory">
             <strong>Direct from Factory</strong>
-            <span>Own factories, fewer intermediaries and clearer pricing.</span>
+            <span>Own China &amp; Thailand factories, fewer intermediaries and supply continuity.</span>
           </article>
         </section>
 
-        <section class="design-service-section">
-          <div>
-            <p class="eyebrow">Free Brand Design</p>
-            <h2>Free brand design for custom packaging</h2>
-            <p>Colour matching, logo placement and dieline support for production-ready packaging.</p>
-          </div>
-          <aside>
-            <strong>100%</strong>
-            <span>Free for all customers</span>
-          </aside>
-          <div class="design-mini-grid">
-            <article><strong>Brand colour matching</strong><span>Print-ready artwork files</span></article>
-            <article><strong>Logo &amp; typography</strong><span>Unlimited revisions</span></article>
-            <article><strong>Dieline &amp; structural design</strong><span>Zero design fees</span></article>
-          </div>
-        </section>
-
-        <section class="factory-cert-grid">
-          <article class="factory-card">
-            <p class="eyebrow">Dual Manufacturing Footprint</p>
-            <h2>China &amp; Thailand, one supply partner</h2>
-            <dl>
-              <div><dt>China &mdash; Anhui Province</dt><dd>BRCGS B+, ISO 9001, FSC, BSCI and Sedex.</dd></div>
-              <div><dt>Thailand &mdash; Chachoengsao</dt><dd>BPI, USDA BioPreferred, BRCGS, FSC, FDA, GRS and OK Compost.</dd></div>
-            </dl>
-            <strong>Same parent company &middot; one contact &middot; supply continuity guaranteed</strong>
-          </article>
-          <article id="certifications" class="cert-section">
-            <p class="eyebrow">Verified Certifications</p>
-            <div class="cert-grid">{certification_cards}</div>
-          </article>
+        <section id="certifications" class="cert-section cert-section--wide">
+          <p class="eyebrow">Verified Certifications</p>
+          <div class="cert-grid">{certification_cards}</div>
         </section>
 
         <section id="range" class="range-section">
