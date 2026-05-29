@@ -25,85 +25,98 @@ Sitemap: {SITE_URL}/sitemap.xml
 
     def catalogue(self):
         quick_rows = quick_order_rows()
+        # Build product showcase cards from PUBLIC_PRODUCTS
+        showcase_cards = ""
+        for product in PUBLIC_PRODUCTS:
+            showcase_cards += f"""
+            <article class="pub-product-card">
+              <div class="pub-product-img-wrap">
+                <img src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
+              </div>
+              <div class="pub-product-body">
+                <p class="pub-product-type">{esc(product["type"])}</p>
+                <h3 class="pub-product-name">{esc(product["name"])}</h3>
+                <div class="pub-product-specs">
+                  <span><strong>{esc(product["size"])}</strong></span>
+                  <span>{esc(product["carton"])}</span>
+                  <span>{esc(product["lid"])}</span>
+                </div>
+                <div class="pub-product-price">
+                  <span class="pub-price-from">From</span>
+                  <strong class="pub-price-value">{money(product["quote_price"])}</strong>
+                  <span class="pub-price-unit">/ box</span>
+                </div>
+              </div>
+              <a class="button primary pub-product-cta" href="#quick-order">Add to Order</a>
+            </article>
+            """
         body = f"""
         <section class="hero">
           <div class="hero-copy">
-            <p class="eyebrow">AUREA Packaging Supply Pty Ltd</p>
+            <p class="eyebrow">AUREA Packaging Supply Pty Ltd &mdash; Melbourne</p>
             <h1>Premium Coffee Cups &amp; Packaging for Cafes</h1>
             <p>Fast delivery across Melbourne. Best pricing based on quantity.</p>
             <ul class="hero-trust">
-              <li><span>&#10003;</span>Bulk pricing for cafes</li>
+              <li><span>&#10003;</span>Bulk pricing for cafes &amp; takeaway shops</li>
               <li><span>&#10003;</span>Fast delivery across Melbourne</li>
-              <li><span>&#10003;</span>Reliable supply for takeaway shops</li>
+              <li><span>&#10003;</span>Kraft cups, lids and packaging in stock</li>
             </ul>
             <div class="hero-actions">
               <a class="button primary" href="#quick-order">Get Best Price Now</a>
+              <a class="button ghost" href="#contact">Contact Us</a>
             </div>
           </div>
         </section>
 
-        <section class="category-section">
+        <section class="why-section">
+          <article>
+            <span class="feature-icon">&#128666;</span>
+            <strong>Fast Delivery</strong>
+            <span>Melbourne supply for cafes and takeaway businesses with short lead times.</span>
+          </article>
+          <article>
+            <span class="feature-icon">&#128176;</span>
+            <strong>Bulk Pricing</strong>
+            <span>Best pricing based on carton quantity. The more you order, the better the rate.</span>
+          </article>
+          <article>
+            <span class="feature-icon">&#128230;</span>
+            <strong>Reliable Supply</strong>
+            <span>Consistent kraft cups and lids always in stock for busy takeaway shops.</span>
+          </article>
+          <article>
+            <span class="feature-icon">&#127807;</span>
+            <strong>Eco-friendly</strong>
+            <span>Natural kraft paper packaging options with a clean, sustainable look.</span>
+          </article>
+        </section>
+
+        <section id="products" class="pub-products-section">
           <div class="section-head">
-            <p class="eyebrow">Cafe Supply Range</p>
-            <h2>Products for Your Cafe</h2>
-            <p>Choose the packaging essentials you need, then send one quick enquiry for final B2B pricing.</p>
+            <p class="eyebrow">Our Products</p>
+            <h2>Cafe Packaging Range</h2>
+            <p>Single wall and double wall kraft cups, universal 90mm lids — everything your cafe needs, ordered in bulk at trade prices.</p>
           </div>
-          <div class="category-grid">
-            <a class="category-card" href="#quick-order">
-              <img src="/static/single-wall-12oz.png" alt="">
-              <strong>Coffee Cups</strong>
-              <span>Single and double wall kraft cups for everyday takeaway coffee.</span>
-            </a>
-            <a class="category-card" href="#quick-order">
-              <img src="/static/lid-90mm.png" alt="">
-              <strong>Lids</strong>
-              <span>90mm compatible lids for core 8 oz, 12 oz and 16 oz cup sizes.</span>
-            </a>
-            <a class="category-card" href="#quick-order">
-              <span class="category-icon">CH</span>
-              <strong>Cup Holders</strong>
-              <span>Carry trays and holders for busy cafe and delivery service.</span>
-            </a>
-            <a class="category-card" href="#quick-order">
-              <span class="category-icon">PB</span>
-              <strong>Paper Bags</strong>
-              <span>Takeaway bags for food, retail and cafe counter orders.</span>
-            </a>
-            <a class="category-card" href="#quick-order">
-              <span class="category-icon">ST</span>
-              <strong>Straws</strong>
-              <span>Simple drink accessories for cold beverage service.</span>
-            </a>
-            <a class="category-card" href="#quick-order">
-              <span class="category-icon">NP</span>
-              <strong>Napkins</strong>
-              <span>Practical table and takeaway napkins for daily operations.</span>
-            </a>
+          <div class="pub-products-grid">
+            {showcase_cards}
           </div>
         </section>
 
-        <section id="quick-order" class="quick-order-section">
+        <section id="quick-order" class="qo-section">
           <div class="section-head">
             <p class="eyebrow">Quick Order</p>
-            <h2>Request Best Price</h2>
-            <p>Select products, enter box quantities, and submit one enquiry. We confirm your best price manually.</p>
+            <h2>Select Products &amp; Quantities</h2>
+            <p>Enter box quantities for what you need, then submit one enquiry. We confirm your best price within one business day.</p>
           </div>
           <form class="quick-order-form" action="/quote" method="get">
             <input type="hidden" name="items" id="quick_order_items">
-            <div class="quick-order-head">
-              <span>Product</span>
-              <span>Carton quantity</span>
-              <span>Lid compatibility</span>
-              <span>Quantity</span>
-              <span>Notes</span>
-            </div>
-            <div class="quick-order-list">
+            <div class="qo-grid">
               {quick_rows}
             </div>
-            <p class="quick-warning" id="quick_order_warning" role="alert">Please enter at least one box quantity before requesting a final price.</p>
-            <div class="quick-order-actions">
-              <span>Bulk pricing available. No payment or checkout.</span>
-              <button class="button primary" type="submit">Request Best Price</button>
+            <p class="quick-warning" id="quick_order_warning" role="alert">Please add a quantity to at least one product before requesting a price.</p>
+            <div class="qo-footer">
+              <span>No payment or checkout &mdash; we confirm final price with you directly.</span>
+              <button class="button primary qo-submit" type="submit">Request Best Price &rarr;</button>
             </div>
           </form>
           <script>
@@ -147,46 +160,16 @@ Sitemap: {SITE_URL}/sitemap.xml
           </script>
         </section>
 
-        <section class="why-section">
-          <article><span class="feature-icon">FD</span><strong>Fast Delivery</strong><span>Melbourne supply for cafes and takeaway businesses.</span></article>
-          <article><span class="feature-icon">BP</span><strong>Bulk Pricing</strong><span>Best pricing based on carton quantity and delivery area.</span></article>
-          <article><span class="feature-icon">RS</span><strong>Reliable Supply</strong><span>Consistent kraft cups and lids for busy takeaway shops.</span></article>
-          <article><span class="feature-icon">EO</span><strong>Eco-friendly Options</strong><span>Practical packaging options with a cleaner kraft look.</span></article>
-        </section>
-
-        <section id="products" class="section-head product-heading">
-          <p class="eyebrow">Products</p>
-          <h2>Cafe Packaging Essentials</h2>
-        </section>
-
-        <section class="product-showcase">
-          <article>
-            <div class="product-image"></div>
-            <h3>Single Wall Kraft Coffee Cups</h3>
-            <p>Lightweight everyday cups for takeaway coffee service.</p>
-          </article>
-          <article>
-            <div class="product-image"></div>
-            <h3>Double Wall Kraft Coffee Cups</h3>
-            <p>Extra insulation and a comfortable hold for hot drinks.</p>
-          </article>
-          <article>
-            <div class="product-image"></div>
-            <h3>90mm Lids</h3>
-            <p>Universal lids compatible with core 8 oz, 12 oz and 16 oz sizes.</p>
-          </article>
-        </section>
-
         <section id="contact" class="contact-section">
           <div>
             <p class="eyebrow">Contact</p>
             <h2>Talk to AUREA</h2>
-            <p>Send a quick order enquiry or contact us for cafe packaging supply in Melbourne.</p>
+            <p>Send a quick order enquiry or contact us directly for cafe packaging supply in Melbourne.</p>
           </div>
           <div class="contact-card">
             <strong>Stone Wang</strong>
-            <a href="tel:0412345678">0412 345 678</a>
-            <a href="mailto:stone.wang@aureapackaging.com.au">stone.wang@aureapackaging.com.au</a>
+            <a href="tel:0497278099">0497 278 099</a>
+            <a href="mailto:info@aureapackaging.com.au">info@aureapackaging.com.au</a>
             <span>Melbourne, Australia</span>
           </div>
         </section>
@@ -194,7 +177,7 @@ Sitemap: {SITE_URL}/sitemap.xml
         <section class="final-cta">
           <div>
             <p class="eyebrow">Ready to Order?</p>
-            <h2>Ready to order for your cafe?</h2>
+            <h2>Ready to stock up your cafe?</h2>
             <p>Send your product quantities once and we will confirm availability, delivery details and the best final price.</p>
           </div>
           <div class="final-cta-actions">
@@ -263,15 +246,26 @@ Sitemap: {SITE_URL}/sitemap.xml
         total_boxes = sum(item["boxes"] for item in selected)
         disabled = "" if selected else "disabled"
         body = f"""
+        <div class="pub-quote-steps">
+          <div class="pub-quote-step pub-quote-step--done">
+            <span>1</span><strong>Select Products</strong>
+          </div>
+          <div class="pub-quote-step pub-quote-step--active">
+            <span>2</span><strong>Your Details</strong>
+          </div>
+          <div class="pub-quote-step">
+            <span>3</span><strong>Get Quote</strong>
+          </div>
+        </div>
         <section class="panel narrow quote-panel">
           <div class="document-brand quote-brand">
             <img src="/static/aurea-logo-light.png" alt="AUREA Packaging Supply Pty Ltd">
           </div>
           <h1>Quick Order Enquiry</h1>
           <div class="quote-summary">
-            <h2>Selected products</h2>
+            <h2>Your selected products</h2>
             {summary_table}
-            <p class="final-price-note">Final price will be confirmed based on quantity, delivery area and availability.</p>
+            <p class="final-price-note">&#9432;&nbsp; Final price confirmed based on quantity, delivery suburb and availability.</p>
           </div>
           <form method="post" class="form quote-form">
             {self.csrf_input()}
@@ -279,15 +273,16 @@ Sitemap: {SITE_URL}/sitemap.xml
             <textarea hidden name="product_interest">{esc(summary_text)}</textarea>
             <textarea hidden name="order_summary">{esc(summary_text)}</textarea>
             <input type="hidden" name="monthly_volume" value="{esc(f'{total_boxes} boxes requested' if total_boxes else '')}">
+            <p class="pub-form-lead">Tell us who you are so we can send your personalised quotation.</p>
             <div class="quote-detail-grid">
-              <label>Business name<input name="business_name" required {disabled}></label>
-              <label>Contact person<input name="contact_name" required {disabled}></label>
-              <label>Phone<input name="phone" required {disabled}></label>
-              <label>Email<input name="email" type="email" required {disabled}></label>
-              <label>Delivery suburb / postcode<input name="delivery_suburb" required {disabled}></label>
+              <label>Business name<input name="business_name" required {disabled} placeholder="Your cafe or business name"></label>
+              <label>Contact person<input name="contact_name" required {disabled} placeholder="Your full name"></label>
+              <label>Phone<input name="phone" required {disabled} placeholder="e.g. 0400 000 000"></label>
+              <label>Email<input name="email" type="email" required {disabled} placeholder="your@email.com"></label>
+              <label>Delivery suburb / postcode<input name="delivery_suburb" required {disabled} placeholder="e.g. Fitzroy 3065"></label>
             </div>
-            <label>Message / special request<textarea name="message" rows="4" placeholder="Delivery timing, invoice details, or any special requirements" {disabled}></textarea></label>
-            <button class="button primary" type="submit" {disabled}>Submit Quick Order Enquiry</button>
+            <label>Message / special request<textarea name="message" rows="3" placeholder="Delivery timing, payment terms, custom print, or any other requirements" {disabled}></textarea></label>
+            <button class="button primary pub-quote-submit" type="submit" {disabled}>Submit Enquiry &rarr;</button>
           </form>
         </section>
         """

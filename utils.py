@@ -982,26 +982,32 @@ def quick_order_rows():
     for product in PUBLIC_PRODUCTS:
         product_id = esc(product["id"])
         rows += f"""
-        <article class="quick-order-item" data-product-row>
-          <span class="selected-badge">Selected</span>
-          <div class="quick-product">
-            <span class="quick-thumb-wrap">
-              <img class="quick-thumb" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
-              <img class="quick-preview" src="{esc(product["image"])}" alt="">
-            </span>
-            <div>
-              <strong>{esc(product["name"])}</strong>
-              <span>{esc(product["size"])} &middot; {esc(product["type"])}</span>
-            </div>
+        <article class="qo-card" data-product-row>
+          <span class="qo-card__badge">&#10003; Added</span>
+          <div class="qo-card__img-wrap">
+            <img class="qo-card__img" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
           </div>
-          <div>{esc(product["carton"])}</div>
-          <div>{esc(product["lid"])}</div>
-          <label>Boxes
-            <input type="number" min="0" step="1" inputmode="numeric" value="0" data-product-id="{product_id}">
-          </label>
-          <label>Notes
-            <input type="text" placeholder="Optional" data-product-note="{product_id}">
-          </label>
+          <div class="qo-card__body">
+            <p class="qo-card__type">{esc(product["type"])}</p>
+            <strong class="qo-card__name">{esc(product["name"])}</strong>
+            <p class="qo-card__size">{esc(product["size"])}</p>
+            <p class="qo-card__carton">{esc(product["carton"])} &middot; {esc(product["lid"])}</p>
+          </div>
+          <div class="qo-card__price">
+            <span>From</span>
+            <strong>{money(product["quote_price"])}</strong>
+            <span>/ box</span>
+          </div>
+          <div class="qo-card__inputs">
+            <label class="qo-card__label">
+              <span>Boxes</span>
+              <input class="qo-card__qty" type="number" min="0" step="1" inputmode="numeric" value="0" data-product-id="{product_id}">
+            </label>
+            <label class="qo-card__label">
+              <span>Note (optional)</span>
+              <input class="qo-card__note" type="text" placeholder="e.g. custom print" data-product-note="{product_id}">
+            </label>
+          </div>
         </article>
         """
     return rows
