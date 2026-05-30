@@ -22,6 +22,50 @@ SEO_DESCRIPTION = (
     "for Australian foodservice, retail and hospitality businesses."
 )
 SEO_IMAGE = f"{SITE_URL}/static/hero-cups.png"
+PRODUCT_CATEGORIES = [
+    {
+        "title": "Cups & Cup Accessories",
+        "slug": "cups-cup-accessories",
+        "description": "Coffee cups, cold cups, lids and cup carriers for cafes and foodservice teams.",
+        "href": "/#products",
+        "image": "/static/images/categories/category-cups.png",
+    },
+    {
+        "title": "Food Containers",
+        "slug": "food-containers",
+        "description": "Takeaway containers, bowls, boxes, trays and clear-lid packaging options.",
+        "href": "/products/food-containers",
+        "image": "/static/images/categories/category-food-containers.png",
+    },
+    {
+        "title": "Paper Bags",
+        "slug": "paper-bags",
+        "description": "Kraft, recycled and custom paper bags for takeaway, retail and delivery.",
+        "href": "/products/paper-bags",
+        "image": "/static/images/categories/category-paper-bags.png",
+    },
+    {
+        "title": "Napkins & Tissues",
+        "slug": "napkins-tissues",
+        "description": "Napkins, tissues and hygiene paper products for hospitality operations.",
+        "href": "/products/napkins-tissues",
+        "image": "/static/images/categories/category-napkins.png",
+    },
+    {
+        "title": "Straws & Accessories",
+        "slug": "straws-accessories",
+        "description": "Paper straws, eco alternatives, cutlery, sleeves and practical service accessories.",
+        "href": "/products/straws-accessories",
+        "image": "/static/images/categories/category-straws.png",
+    },
+    {
+        "title": "Custom Packaging Solutions",
+        "slug": "custom-packaging-solutions",
+        "description": "Logo printing, stickers, labels, dielines and brand-ready packaging support.",
+        "href": "/products/custom-packaging-solutions",
+        "image": "/static/images/categories/category-custom-packaging.png",
+    },
+]
 PRODUCT_RANGE = [
     ("Paper cups", "Single/double/ripple wall, PLA or PE, 3-44oz, compostable options"),
     ("Soup & salad bowls", "6-50oz, kraft and white, paper/PP/PET/PLA lids"),
@@ -193,6 +237,14 @@ def layout(title, body, authed=False, noindex=False):
         """
     else:
         admin_links = '<a href="/admin/login">Admin</a>'
+    product_nav = "".join(
+        f'<a href="{esc(category["href"])}">{esc(category["title"])}</a>'
+        for category in PRODUCT_CATEGORIES
+    )
+    footer_products = "".join(
+        f'<a href="{esc(category["href"])}">{esc(category["title"])}</a>'
+        for category in PRODUCT_CATEGORIES
+    )
     page_title = SEO_TITLE if title == "Product Catalogue" else f"{esc(title)} | AUREA Packaging"
     robots_meta = '<meta name="robots" content="noindex, nofollow">' if noindex else ""
     seo_meta = "" if noindex else f"""
@@ -240,17 +292,41 @@ def layout(title, body, authed=False, noindex=False):
           <img class="brand-logo" src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
           <span><strong>AUREA</strong><small>Packaging Supply Pty Ltd</small></span>
         </a>
-        <nav>
-          <a href="/#products">Products</a>
-          <a href="/#range">Range</a>
-          <a href="/#certifications">Certifications</a>
-          <a href="/#contact">Contact Us</a>
+        <nav class="site-nav">
+          <a href="/">Home</a>
+          <div class="nav-dropdown">
+            <a class="nav-dropdown__toggle" href="/#product-categories">Products</a>
+            <div class="nav-dropdown__menu" aria-label="Product categories">
+              {product_nav}
+            </div>
+          </div>
+          <a href="/#products">Quick Order</a>
+          <a href="/#about">About Us</a>
+          <a href="/#contact">Contact</a>
           <a class="nav-cta" href="/quote">Request Quote</a>
           {admin_links}
         </nav>
       </header>
       <main>{body}</main>
-      <footer>AUREA Packaging Supply Pty Ltd &middot; {PUBLIC_LOCATION} &middot; {PUBLIC_EMAIL}</footer>
+      <footer class="site-footer">
+        <div>
+          <h2>Company</h2>
+          <a href="/">AUREA Packaging Supply Pty Ltd</a>
+          <a href="/#about">Why Choose AUREA</a>
+          <a href="/#contact">Contact Us</a>
+        </div>
+        <div>
+          <h2>Products</h2>
+          {footer_products}
+        </div>
+        <div>
+          <h2>Contact</h2>
+          <a href="tel:{PUBLIC_PHONE_TEL}">{PUBLIC_PHONE_DISPLAY}</a>
+          <a href="mailto:{PUBLIC_EMAIL}">{PUBLIC_EMAIL}</a>
+          <a href="https://{PUBLIC_WEBSITE}">{PUBLIC_WEBSITE}</a>
+          <span>{PUBLIC_LOCATION}</span>
+        </div>
+      </footer>
     </body>
     </html>"""
 
@@ -1026,16 +1102,13 @@ def quick_order_rows():
           <span class="qo-card__badge">&#10003; Added</span>
           <div class="qo-card__img-wrap">
             <img class="qo-card__img" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
+            <img class="qo-card__preview" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])} enlarged preview" aria-hidden="true">
           </div>
           <div class="qo-card__body">
             <p class="qo-card__type">{esc(product["type"])}</p>
             <strong class="qo-card__name">{esc(product["name"])}</strong>
             <p class="qo-card__size">{esc(product["size"])}</p>
             <p class="qo-card__carton">{esc(product["carton"])} &middot; {esc(product["lid"])}</p>
-          </div>
-          <div class="qo-card__price qo-card__price--hidden" aria-label="Price confirmed after enquiry">
-            <strong>Price after enquiry</strong>
-            <span>Submit quantities and details to receive pricing.</span>
           </div>
           <div class="qo-card__inputs">
             <label class="qo-card__label">

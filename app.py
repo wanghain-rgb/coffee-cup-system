@@ -30,6 +30,11 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
                 return self.respond("Invalid request. Please go back and try again.", 403, content_type="text/plain")
         if path.startswith("/static/"):
             return self.static_file(path)
+        if path.startswith("/products/"):
+            parts = path.strip("/").split("/")
+            if len(parts) == 2:
+                return self.product_category_page(parts[1])
+            return self.respond("Not found", 404, content_type="text/plain")
         if path.startswith("/admin/invoices/"):
             parts = path.strip("/").split("/")
             if len(parts) == 4 and parts[3] == "edit":

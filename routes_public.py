@@ -30,6 +30,95 @@ def range_icon_svg(name):
     return f'<span class="range-icon" aria-hidden="true"><svg viewBox="0 0 68 68" focusable="false">{icon}</svg></span>'
 
 
+def category_lookup(slug):
+    for category in PRODUCT_CATEGORIES:
+        if category["slug"] == slug:
+            return category
+    return None
+
+
+def category_cards():
+    cards = ""
+    for category in PRODUCT_CATEGORIES:
+        cards += f"""
+        <a class="category-card" href="{esc(category["href"])}" aria-label="Explore {esc(category["title"])}">
+          <span class="category-card__media">
+            <img src="{esc(category["image"])}" alt="{esc(category["title"])} packaging category" loading="lazy" onerror="this.hidden=true; this.closest('.category-card__media').classList.add('is-missing-image');">
+          </span>
+          <strong>{esc(category["title"])}</strong>
+        </a>
+        """
+    return cards
+
+
+CERTIFICATION_LOGOS = [
+    {
+        "name": "BRCGS Certified",
+        "detail": "Packaging materials and food safety standards",
+        "image": "/static/images/certifications/brcgs.png",
+    },
+    {
+        "name": "FSC Certified",
+        "detail": "Responsible fibre sourcing",
+        "image": "/static/images/certifications/fsc.png",
+    },
+    {
+        "name": "ISO 9001",
+        "detail": "Quality management systems",
+        "image": "/static/images/certifications/iso-9001.png",
+    },
+    {
+        "name": "amfori BSCI",
+        "detail": "Social compliance support",
+        "image": "/static/images/certifications/amfori-bsci.png",
+    },
+    {
+        "name": "Sedex / SMETA",
+        "detail": "Ethical trade audit support",
+        "image": "/static/images/certifications/sedex-smeta.png",
+    },
+    {
+        "name": "BPI Compostable",
+        "detail": "Certified compostable materials",
+        "image": "/static/images/certifications/bpi-compostable.png",
+    },
+    {
+        "name": "USDA BioPreferred",
+        "detail": "Bio-based product programme",
+        "image": "/static/images/certifications/usda-biopreferred.png",
+    },
+    {
+        "name": "FDA Compliant",
+        "detail": "Food contact safety",
+        "image": "/static/images/certifications/fda-compliant.png",
+    },
+    {
+        "name": "GRS / rPET",
+        "detail": "Global recycled material standard",
+        "image": "/static/images/certifications/grs-rpet.png",
+    },
+    {
+        "name": "OK Compost HOME",
+        "detail": "Home compost certification support",
+        "image": "/static/images/certifications/ok-compost-home.png",
+    },
+]
+
+
+def certification_logo_cards():
+    cards = ""
+    for cert in CERTIFICATION_LOGOS:
+        cards += f"""
+        <article class="cert-logo-card">
+          <span class="cert-logo-card__media" data-label="{esc(cert["name"])}">
+            <img src="{esc(cert["image"])}" alt="{esc(cert["name"])} logo" loading="lazy" onerror="this.remove(); this.closest('.cert-logo-card').classList.add('is-missing-logo');">
+          </span>
+          <strong>{esc(cert["name"])}</strong>
+        </article>
+        """
+    return cards
+
+
 class PublicRoutesMixin:
     def robots_txt(self):
         content = f"""User-agent: *
@@ -50,26 +139,8 @@ Sitemap: {SITE_URL}/sitemap.xml
 
     def catalogue(self):
         quick_rows = quick_order_rows()
-        range_cards = ""
-        for name, detail in PRODUCT_RANGE:
-            range_cards += f"""
-            <article class="range-card">
-              {range_icon_svg(name)}
-              <div>
-                <h3>{esc(name)}</h3>
-                <p>{esc(detail)}</p>
-                <strong>Both factories</strong>
-              </div>
-            </article>
-            """
-        certification_cards = ""
-        for name, detail in CERTIFICATIONS:
-            certification_cards += f"""
-            <article class="cert-card">
-              <span class="cert-mark">{esc(name)}</span>
-              <p>{esc(detail)}</p>
-            </article>
-            """
+        product_category_cards = category_cards()
+        certification_cards = certification_logo_cards()
         body = f"""
         <section class="hero hero-carousel" aria-label="AUREA packaging highlights">
           <div class="hero-slide is-active" data-hero-slide style="--hero-image: url('/static/hero-warehouse-supply.png')">
@@ -79,7 +150,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               <p>Paper cups, bowls, take-out boxes, bags, labels and sustainable packaging for every business.</p>
               <div class="hero-actions">
                 <a class="button primary" href="#products">Request a Quote</a>
-                <a class="button ghost" href="#range">View Range</a>
+                <a class="button ghost" href="#product-categories">View Categories</a>
               </div>
             </div>
           </div>
@@ -111,8 +182,8 @@ Sitemap: {SITE_URL}/sitemap.xml
               <h1>Bowls, take-out boxes and paper bags</h1>
               <p>Soup and salad bowls, folded kraft boxes, sugarcane tableware and food-grade bag options.</p>
               <div class="hero-actions">
-                <a class="button primary" href="#range">Explore Categories</a>
-                <a class="button ghost" href="#certifications">View Certifications</a>
+                <a class="button primary" href="#product-categories">Explore Categories</a>
+                <a class="button ghost" href="#contact">Ask About Supply</a>
               </div>
             </div>
           </div>
@@ -123,7 +194,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               <p>Logo printing, sticker labels, branded napkins and premium packaging artwork support.</p>
               <div class="hero-actions">
                 <a class="button primary" href="#contact">Start Custom Design</a>
-                <a class="button ghost" href="#range">View Packaging Range</a>
+                <a class="button ghost" href="#product-categories">View Packaging Range</a>
               </div>
             </div>
           </div>
@@ -136,55 +207,24 @@ Sitemap: {SITE_URL}/sitemap.xml
           </div>
         </section>
 
-        <section class="brand-strip" aria-label="AUREA supply summary">
-          <strong>Comprehensive packaging supplier</strong>
-          <span>Two factories</span>
-          <span>AU local warehouse</span>
-          <span>Free brand design</span>
-          <span>Certified materials</span>
-        </section>
-
-        <section class="why-section">
-          <article class="why-card why-card--design">
-            <strong>Free Design Service</strong>
-            <span>Brand colour matching, logo placement, dieline support and print-ready artwork files.</span>
-          </article>
-          <article class="why-card why-card--warehouse">
-            <strong>AU Local Warehouse</strong>
-            <span>Popular SKUs held in Australia for faster dispatch.</span>
-          </article>
-          <article class="why-card why-card--compliance">
-            <strong>US-Listed Co. Supplier</strong>
-            <span>Business-ready compliance and supply documentation.</span>
-          </article>
-          <article class="why-card why-card--factory">
-            <strong>Direct from Factory</strong>
-            <span>Own China &amp; Thailand factories, fewer intermediaries and supply continuity.</span>
-          </article>
-        </section>
-
-        <section id="certifications" class="cert-section cert-section--wide">
-          <p class="eyebrow">Verified Certifications</p>
-          <div class="cert-grid">{certification_cards}</div>
-        </section>
-
-        <section id="range" class="range-section">
+        <section id="product-categories" class="category-section">
           <div class="section-head">
-            <p class="eyebrow">Full Product Range</p>
-            <h2>Packaging categories across both factories</h2>
-            <p>From cups and take-out boxes to bags, labels, wraps and compostable tableware, AUREA supports stock supply and custom packaging programs.</p>
+            <h2>Shop by Product Category</h2>
           </div>
-          <div class="range-grid">{range_cards}</div>
+          <div class="category-grid">{product_category_cards}</div>
         </section>
 
-        <section class="vision-section">
-          <p class="eyebrow">Our Vision</p>
-          <h2>Making sustainable packaging the easy choice for every business, everywhere</h2>
-          <div class="vision-grid">
-            <article><strong>Sustainable &amp; affordable</strong><span>Factory-direct pricing with certified eco-materials and no green premium.</span></article>
-            <article><strong>Partner, not a vendor</strong><span>Free design, local stock and compliance documents in one relationship.</span></article>
-            <article><strong>Material innovation</strong><span>rPET, CPLA, PHA, water-based coatings and ahead-of-global-regulation options.</span></article>
-            <article><strong>Greener supply chain</strong><span>Certified products, honest claims and built for the long term.</span></article>
+        <section id="about" class="why-choose-section">
+          <div class="section-head">
+            <p class="eyebrow">Why Choose AUREA</p>
+            <h2>Built for busy cafes, foodservice buyers and growing packaging programs</h2>
+          </div>
+          <div class="why-choose-grid">
+            <article><strong>Bulk Pricing</strong><span>Factory-direct supply helps support competitive carton and pallet pricing.</span></article>
+            <article><strong>Fast Melbourne Delivery</strong><span>Local stock options for common SKUs and practical delivery planning.</span></article>
+            <article><strong>Reliable Supply</strong><span>Two-factory sourcing supports continuity across seasonal and contract demand.</span></article>
+            <article><strong>Cafe-focused Packaging</strong><span>Cups, lids, napkins and takeaway essentials built around daily service.</span></article>
+            <article><strong>Custom Packaging Support</strong><span>Logo placement, stickers, dielines and print-ready artwork support.</span></article>
           </div>
         </section>
 
@@ -206,7 +246,7 @@ Sitemap: {SITE_URL}/sitemap.xml
 
         <section id="products" class="qo-section">
           <div class="section-head">
-            <p class="eyebrow">Products &amp; Quick Order</p>
+            <p class="eyebrow">Featured Products</p>
             <h2>Coffee cup essentials you can quote directly</h2>
             <p>Review product images and carton details, then enter quantities on the same card. Pricing appears after you submit your enquiry details.</p>
           </div>
@@ -262,6 +302,14 @@ Sitemap: {SITE_URL}/sitemap.xml
           </script>
         </section>
 
+        <section id="certifications" class="cert-logo-section">
+          <div class="cert-logo-intro">
+            <h2>Verified Certifications</h2>
+            <p>Food-safe packaging from trusted manufacturing partners.</p>
+          </div>
+          <div class="cert-logo-grid">{certification_cards}</div>
+        </section>
+
         <section id="contact" class="contact-section">
           <div>
             <p class="eyebrow">Contact</p>
@@ -279,6 +327,29 @@ Sitemap: {SITE_URL}/sitemap.xml
 
         """
         self.respond(layout("Product Catalogue", body, self.is_authed()))
+
+    def product_category_page(self, slug):
+        category = category_lookup(slug)
+        if not category or category["href"] == "/#products":
+            return self.redirect("/#products")
+        body = f"""
+        <section class="category-placeholder-page">
+          <div class="category-placeholder__image">
+            <img src="{esc(category["image"])}" alt="{esc(category["title"])} packaging category" loading="lazy" onerror="this.hidden=true; this.closest('.category-placeholder__image').classList.add('is-missing-image');">
+          </div>
+          <div class="category-placeholder__copy">
+            <p class="eyebrow">Product Category</p>
+            <h1>{esc(category["title"])}</h1>
+            <strong>Coming Soon</strong>
+            <p>{esc(category["description"])} Product details, pack sizes and image galleries will be added here as the range is finalised.</p>
+            <div class="hero-actions">
+              <a class="button primary" href="/#contact">Contact Us</a>
+              <a class="button ghost" href="/#products">Quick Order</a>
+            </div>
+          </div>
+        </section>
+        """
+        self.respond(layout(category["title"], body, self.is_authed()))
 
     def quote(self):
         if self.command == "POST":
