@@ -1,27 +1,64 @@
+from collections import defaultdict
 from datetime import date
 from http.cookies import SimpleCookie
 from urllib.parse import parse_qs, urlparse
 import mimetypes
 import os
 import sys
+import time
 import traceback
 
 from db import db
 from utils import *
 
+# Login rate limiting: max 5 failures per IP within a 10-minute window
+_login_failures: dict = defaultdict(lambda: {"count": 0, "window_start": 0.0})
+_RATE_LIMIT_MAX = 5
+_RATE_LIMIT_WINDOW = 600  # seconds
+
+
+def _check_rate_limit(ip: str) -> bool:
+    """Return True if the IP is currently rate-limited."""
+    record = _login_failures[ip]
+    now = time.time()
+    if now - record["window_start"] > _RATE_LIMIT_WINDOW:
+        record["count"] = 0
+        record["window_start"] = now
+    return record["count"] >= _RATE_LIMIT_MAX
+
+
+def _record_failure(ip: str) -> None:
+    record = _login_failures[ip]
+    now = time.time()
+    if now - record["window_start"] > _RATE_LIMIT_WINDOW:
+        record["count"] = 0
+        record["window_start"] = now
+    record["count"] += 1
+
+
+def _clear_failures(ip: str) -> None:
+    _login_failures.pop(ip, None)
+
+
 class AdminRoutesMixin:
     def login(self):
         if self.command == "POST":
-            f = self.form()
-            if f.get("username") == ADMIN_USER and f.get("password") == ADMIN_PASSWORD:
-                secure = "; Secure" if os.environ.get("DATABASE_URL") else ""
-                cookie = f"cupflow_session={sign('admin')}; HttpOnly; SameSite=Strict; Path=/{secure}"
-                self.send_response(303)
-                self.send_header("Location", "/admin")
-                self.send_header("Set-Cookie", cookie)
-                self.end_headers()
-                return
-            error = '<p class="alert">Invalid username or password.</p>'
+            ip = self.client_address[0]
+            if _check_rate_limit(ip):
+                error = '<p class="alert">Too many failed attempts. Please try again in 10 minutes.</p>'
+            else:
+                f = self.form()
+                if f.get("username") == ADMIN_USER and f.get("password") == ADMIN_PASSWORD:
+                    _clear_failures(ip)
+                    secure = "; Secure" if os.environ.get("DATABASE_URL") else ""
+                    cookie = f"cupflow_session={sign('admin')}; HttpOnly; SameSite=Strict; Path=/{secure}"
+                    self.send_response(303)
+                    self.send_header("Location", "/admin")
+                    self.send_header("Set-Cookie", cookie)
+                    self.end_headers()
+                    return
+                _record_failure(ip)
+                error = '<p class="alert">Invalid username or password.</p>'
         else:
             error = ""
         body = f"""
