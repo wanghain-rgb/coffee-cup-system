@@ -101,7 +101,22 @@ def db():
     return DbConnection()
 
 
+_ALLOWED_TABLES = {
+    "products", "customers", "purchase_orders", "purchase_order_lines",
+    "purchase_batches", "purchase_lines", "sales_orders", "sales_lines",
+    "quote_requests", "invoices", "invoice_lines",
+}
+
+_ALLOWED_COLUMNS = {
+    "gross_profit", "supplier_id", "bsb", "account_number", "bank_name",
+    "freight_alloc", "landed_unit_cost", "remaining_cartons", "total_paid",
+    "invoice_snapshot",
+}
+
+
 def ensure_column(conn, table, column, ddl):
+    if table not in _ALLOWED_TABLES or column not in _ALLOWED_COLUMNS:
+        raise ValueError(f"ensure_column: disallowed table '{table}' or column '{column}'")
     if conn.is_postgres:
         existing = {
             row["column_name"]

@@ -23,9 +23,9 @@ class InvoiceRoutesMixin:
                 if not selected_lines:
                     return self.redirect("/admin/invoices")
                 total_inc_gst = subtotal_total + gst_total
-                total_paid = float(f.get("total_paid") or 0)
+                total_paid = safe_float(f.get("total_paid"))
                 invoice_number = next_invoice_number(conn, issue_date)
-                snapshot = customer_snapshot(conn, int(f.get("customer_id")))
+                snapshot = customer_snapshot(conn, safe_int(f.get("customer_id")))
                 cur = conn.execute(
                     """
                     INSERT INTO invoices
@@ -36,7 +36,7 @@ class InvoiceRoutesMixin:
                     """,
                     (
                         invoice_number,
-                        int(f.get("customer_id")),
+                        safe_int(f.get("customer_id")),
                         snapshot["business_name"],
                         snapshot["abn"],
                         snapshot["billing_address"],
@@ -138,8 +138,8 @@ class InvoiceRoutesMixin:
                     error = '<p class="alert">Please add at least one invoice line before saving.</p>'
                 else:
                     total_inc_gst = subtotal_total + gst_total
-                    total_paid = float(f.get("total_paid") or 0)
-                    snapshot = customer_snapshot(conn, int(f.get("customer_id")))
+                    total_paid = safe_float(f.get("total_paid"))
+                    snapshot = customer_snapshot(conn, safe_int(f.get("customer_id")))
                     # Temporary testing rule:
                     # all invoice statuses are editable/deletable.
                     # Before formal production use,
@@ -155,7 +155,7 @@ class InvoiceRoutesMixin:
                         WHERE id = ?
                         """,
                         (
-                            int(f.get("customer_id")),
+                            safe_int(f.get("customer_id")),
                             snapshot["business_name"],
                             snapshot["abn"],
                             snapshot["billing_address"],

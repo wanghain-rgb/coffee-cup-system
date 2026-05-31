@@ -3,6 +3,20 @@ import html
 import hmac
 import os
 
+
+def safe_int(value, default=0):
+    try:
+        return int(value) if value not in (None, "") else default
+    except (ValueError, TypeError):
+        raise ValueError(f"Expected an integer, got: {value!r}")
+
+
+def safe_float(value, default=0.0):
+    try:
+        return float(value) if value not in (None, "") else default
+    except (ValueError, TypeError):
+        raise ValueError(f"Expected a number, got: {value!r}")
+
 APP_NAME = "CupFlow"
 # Render's normal/free filesystem is ephemeral. If this SQLite file is stored
 # there, business data can be lost on redeploy/restart/spin-down. Use

@@ -349,7 +349,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                     products = product_by_id()
                     product_id = f.get("product_id")
                     try:
-                        qty = int(f.get("quantity") or 1)
+                        qty = safe_int(f.get("quantity"), default=1)
                     except ValueError:
                         qty = 0
                     if product_id not in products or qty < 1:

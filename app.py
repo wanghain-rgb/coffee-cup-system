@@ -2,9 +2,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 from http.cookies import SimpleCookie
 from datetime import date, timedelta
+import logging
 import os
 import sys
 import traceback
+
+logger = logging.getLogger(__name__)
 
 from db import DB_PATH, DATABASE_URL, db, init_db
 from routes_admin import AdminRoutesMixin
@@ -99,9 +102,8 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
             return self.respond("Not found", 404)
         try:
             return handler()
-        except Exception as exc:
-            print(f"Unhandled error while serving {path}: {exc}")
-            traceback.print_exc()
+        except Exception:
+            logger.exception("Unhandled error while serving %s", path)
             return self.respond("Sorry, something went wrong. Please try again.", 500)
 
     def is_authed(self):
@@ -197,7 +199,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
                         VALUES (?, ?, 'Draft', ?, ?, ?, ?)
                         """,
                         (
-                            int(f.get("supplier_id")),
+                            safe_int(f.get("supplier_id")),
                             f.get("order_date") or date.today().isoformat(),
                             subtotal_total,
                             gst_total,
@@ -367,7 +369,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
                         WHERE id = ?
                         """,
                         (
-                            int(f.get("supplier_id")),
+                            safe_int(f.get("supplier_id")),
                             f.get("order_date") or date.today().isoformat(),
                             subtotal_total,
                             gst_total,
@@ -457,9 +459,9 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
             notice = '<p class="notice">Purchase batch saved successfully.</p>'
         if self.command == "POST":
             f = self.form()
-            qty = int(f.get("qty_cartons") or 0)
-            unit_cost = float(f.get("unit_cost") or 0)
-            freight = float(f.get("freight_cost") or 0)
+            qty = safe_int(f.get("qty_cartons"))
+            unit_cost = safe_float(f.get("unit_cost"))
+            freight = safe_float(f.get("freight_cost"))
             landed = unit_cost + (freight / qty if qty else 0)
             with db() as conn:
                 cur = conn.execute(
@@ -472,7 +474,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
                     (batch_id, product_id, qty_cartons, unit_cost, freight_alloc, remaining_cartons, landed_unit_cost)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (cur.lastrowid, int(f.get("product_id")), qty, unit_cost, freight, qty, landed),
+                    (cur.lastrowid, safe_int(f.get("product_id")), qty, unit_cost, freight, qty, landed),
                 )
                 conn.commit()
             return self.redirect("/admin/purchases?saved=purchase")
@@ -585,7 +587,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
                     return self.redirect("/admin/sales?saved=no_lines")
                 cur = conn.execute(
                     "INSERT INTO sales_orders (customer_id, order_date, status, notes) VALUES (?, ?, 'Draft', ?)",
-                    (int(f.get("customer_id")), f.get("order_date") or date.today().isoformat(), f.get("notes")),
+                    (safe_int(f.get("customer_id")), f.get("order_date") or date.today().isoformat(), f.get("notes")),
                 )
                 insert_sales_lines(conn, cur.lastrowid, selected_lines)
                 conn.commit()

@@ -23,7 +23,7 @@ class ProductRoutesMixin:
             action = f.get("action") or "save"
             with db() as conn:
                 if action == "deactivate":
-                    conn.execute("UPDATE products SET active = 0 WHERE id = ?", (int(f.get("product_id")),))
+                    conn.execute("UPDATE products SET active = 0 WHERE id = ?", (safe_int(f.get("product_id")),))
                     conn.commit()
                     return self.redirect("/admin/products?saved=deactivated")
 
@@ -41,8 +41,8 @@ class ProductRoutesMixin:
                 if not (f.get("tax_type") or "").strip():
                     required_missing.append("tax type")
                 try:
-                    qty_per_carton = int(f.get("qty_per_carton") or 0)
-                    sell_price = float(f.get("sell_price") or 0)
+                    qty_per_carton = safe_int(f.get("qty_per_carton"))
+                    sell_price = safe_float(f.get("sell_price"))
                 except ValueError:
                     qty_per_carton = 0
                     sell_price = 0.0
