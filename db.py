@@ -111,6 +111,9 @@ _ALLOWED_COLUMNS = {
     "gross_profit", "supplier_id", "bsb", "account_number", "bank_name",
     "freight_alloc", "landed_unit_cost", "remaining_cartons", "total_paid",
     "invoice_snapshot",
+    "abn", "billing_address", "shipping_address",
+    "product_type", "tax_type", "barcode", "stock_qty", "avg_cost",
+    "confirmed_at", "sales_order_id", "customer_business_name", "customer_abn",
 }
 
 
