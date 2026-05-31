@@ -137,7 +137,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
 
     def quote_cart_data(self):
         signed = SimpleCookie(self.headers.get("Cookie")).get("quote_cart")
-        raw = verify(signed.value) if signed else ""
+        raw = verify(signed.value, max_age=90 * 24 * 3600) if signed else ""  # 90-day cart lifetime
         return parse_quote_cart(raw or "")
 
     def quote_cart_cookie(self, cart, max_age=None):
@@ -150,8 +150,22 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         return quote_cart_count(self.quote_cart_data())
 
     def respond(self, content, status=200, content_type="text/html", cookies=None):
+        is_production = bool(DATABASE_URL)
         self.send_response(status)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.send_header("X-Frame-Options", "DENY")
+        self.send_header("X-XSS-Protection", "1; mode=block")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
+        if content_type == "text/html":
+            self.send_header(
+                "Content-Security-Policy",
+                "default-src 'self'; script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; img-src 'self' https: data:; "
+                "font-src 'self'; frame-ancestors 'none';",
+            )
+        if is_production:
+            self.send_header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
         if cookies:
             for cookie in cookies:
                 self.send_header("Set-Cookie", cookie)

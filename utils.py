@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 import html
 import hmac
 import os
+import time
 
 
 def safe_int(value, default=0):
@@ -241,17 +242,41 @@ def esc(value):
     return html.escape("" if value is None else str(value))
 
 
-def sign(value):
-    digest = hmac.new(SECRET.encode(), value.encode(), "sha256").hexdigest()
-    return f"{value}.{digest}"
+_SESSION_MAX_AGE = 8 * 3600  # 8 hours
 
 
-def verify(signed):
+def sign(value, max_age=None):
+    """Sign a value with an HMAC digest and an embedded timestamp."""
+    ts = str(int(time.time()))
+    payload = f"{value}:{ts}"
+    digest = hmac.new(SECRET.encode(), payload.encode(), "sha256").hexdigest()
+    return f"{payload}.{digest}"
+
+
+def verify(signed, max_age=None):
+    """Verify a signed token and check it has not expired.
+
+    max_age defaults to _SESSION_MAX_AGE for session cookies; pass a custom
+    value (or None to skip expiry) for other uses such as quote_cart.
+    """
     if not signed or "." not in signed:
         return None
-    value, digest = signed.rsplit(".", 1)
-    expected = hmac.new(SECRET.encode(), value.encode(), "sha256").hexdigest()
-    return value if hmac.compare_digest(digest, expected) else None
+    payload, digest = signed.rsplit(".", 1)
+    expected = hmac.new(SECRET.encode(), payload.encode(), "sha256").hexdigest()
+    if not hmac.compare_digest(digest, expected):
+        return None
+    if ":" not in payload:
+        # Legacy token without timestamp — treat as expired
+        return None
+    value, ts_str = payload.rsplit(":", 1)
+    try:
+        age = int(time.time()) - int(ts_str)
+    except ValueError:
+        return None
+    effective_max_age = _SESSION_MAX_AGE if max_age is None else max_age
+    if age > effective_max_age:
+        return None
+    return value
 
 
 def make_csrf_token(session_sig):

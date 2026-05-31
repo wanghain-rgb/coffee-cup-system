@@ -535,7 +535,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                 return self.redirect("/quote-cart?removed=1", cookies=[self.quote_cart_cookie(cart)])
             if action == "submit":
                 if not cart:
-                    cart = parse_quote_cart(verify(f.get("cart_snapshot")) or "")
+                    cart = parse_quote_cart(verify(f.get("cart_snapshot"), max_age=3600) or "")
                 items = quote_cart_items(cart)
                 if not items:
                     return self.redirect("/quote-cart?error=empty")
