@@ -55,52 +55,52 @@ CERTIFICATION_LOGOS = [
     {
         "name": "BRCGS Certified",
         "detail": "Packaging materials and food safety standards",
-        "image": "/static/images/certifications/brcgs.png",
+        "image": "/static/images/certifications/brcgs.webp",
     },
     {
         "name": "FSC Certified",
         "detail": "Responsible fibre sourcing",
-        "image": "/static/images/certifications/fsc.png",
+        "image": "/static/images/certifications/fsc.webp",
     },
     {
         "name": "ISO 9001",
         "detail": "Quality management systems",
-        "image": "/static/images/certifications/iso-9001.png",
+        "image": "/static/images/certifications/iso-9001.webp",
     },
     {
         "name": "amfori BSCI",
         "detail": "Social compliance support",
-        "image": "/static/images/certifications/amfori-bsci.png",
+        "image": "/static/images/certifications/amfori-bsci.webp",
     },
     {
         "name": "Sedex / SMETA",
         "detail": "Ethical trade audit support",
-        "image": "/static/images/certifications/sedex-smeta.png",
+        "image": "/static/images/certifications/sedex-smeta.webp",
     },
     {
         "name": "BPI Compostable",
         "detail": "Certified compostable materials",
-        "image": "/static/images/certifications/bpi-compostable.png",
+        "image": "/static/images/certifications/bpi-compostable.webp",
     },
     {
         "name": "USDA BioPreferred",
         "detail": "Bio-based product programme",
-        "image": "/static/images/certifications/usda-biopreferred.png",
+        "image": "/static/images/certifications/usda-biopreferred.webp",
     },
     {
         "name": "FDA Compliant",
         "detail": "Food contact safety",
-        "image": "/static/images/certifications/fda-compliant.png",
+        "image": "/static/images/certifications/fda-compliant.webp",
     },
     {
         "name": "GRS / rPET",
         "detail": "Global recycled material standard",
-        "image": "/static/images/certifications/grs-rpet.png",
+        "image": "/static/images/certifications/grs-rpet.webp",
     },
     {
         "name": "OK Compost HOME",
         "detail": "Home compost certification support",
-        "image": "/static/images/certifications/ok-compost-home.png",
+        "image": "/static/images/certifications/ok-compost-home.webp",
     },
 ]
 
@@ -117,6 +117,64 @@ def certification_logo_cards():
         </article>
         """
     return cards
+
+
+def cup_accessories_cards():
+    cards = ""
+    sorted_products = sorted(PUBLIC_PRODUCTS, key=lambda product: 1 if "lid" in product["name"].lower() else 0)
+    for product in sorted_products:
+        product_id = esc(product["id"])
+        cards += f"""
+        <article class="category-product-card">
+          <a class="category-product-card__image" href="/#products" aria-label="Quote {esc(product["name"])} {esc(product["size"])}">
+            <img src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}" loading="lazy" decoding="async">
+          </a>
+          <div class="category-product-card__body">
+            <span class="category-product-card__tag">{esc(product["type"])}</span>
+            <h3>{esc(product["name"])}</h3>
+            <p class="category-product-card__size">{esc(product["size"])}</p>
+            <p>{esc(product["carton"])} &middot; {esc(product["lid"])}</p>
+            <div class="category-product-card__cart">
+              <label for="category_qty_{product_id}">Qty of Cartons</label>
+              <div>
+                <input id="category_qty_{product_id}" type="number" min="0" step="1" inputmode="numeric" aria-label="Quantity of cartons for {esc(product["name"])} {esc(product["size"])}">
+                <a href="/#products">Add to Cart</a>
+              </div>
+            </div>
+          </div>
+        </article>
+        """
+    return cards
+
+
+def cups_filter_panel():
+    filter_groups = [
+        "Product Type",
+        "Cup Size",
+        "Wall Type",
+        "Lid Compatibility",
+        "Material",
+        "Carton Quantity",
+        "Custom Print",
+    ]
+    groups = "".join(
+        f'<button class="category-filter-row" type="button"><span>{esc(group)}</span><span aria-hidden="true">+</span></button>'
+        for group in filter_groups
+    )
+    return f"""
+    <aside class="category-filters" aria-label="Product filters">
+      <div class="category-filters__head">
+        <span aria-hidden="true">Filter</span>
+        <a href="/products/cups-cup-accessories">Reset all</a>
+      </div>
+      <div class="category-filter-help">
+        <strong>I want to</strong>
+        <p>Review cup sizes, wall types and lid compatibility before requesting a quote.</p>
+        <a href="/#products">Quick Order</a>
+      </div>
+      {groups}
+    </aside>
+    """
 
 
 class PublicRoutesMixin:
@@ -143,7 +201,7 @@ Sitemap: {SITE_URL}/sitemap.xml
         certification_cards = certification_logo_cards()
         body = f"""
         <section class="hero hero-carousel" aria-label="AUREA packaging highlights">
-          <div class="hero-slide is-active" data-hero-slide style="--hero-image: url('/static/hero-warehouse-supply.png')">
+          <div class="hero-slide is-active" data-hero-slide data-hero-image="/static/hero-warehouse-supply.webp" style="--hero-image: url('/static/hero-warehouse-supply.webp')">
             <div class="hero-copy">
               <p class="eyebrow">Manufacturer + Direct Sales</p>
               <h1>Full product range from both factories</h1>
@@ -154,7 +212,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               </div>
             </div>
           </div>
-          <div class="hero-slide" data-hero-slide style="--hero-image: url('/static/hero-logistics-delivery.png')">
+          <div class="hero-slide" data-hero-slide data-hero-image="/static/hero-logistics-delivery.webp">
             <div class="hero-copy">
               <p class="eyebrow">AU Local Warehouse</p>
               <h1>Local stock. Same-week dispatch.</h1>
@@ -165,7 +223,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               </div>
             </div>
           </div>
-          <div class="hero-slide" data-hero-slide style="--hero-image: url('/static/hero-cafe-cups.png')">
+          <div class="hero-slide" data-hero-slide data-hero-image="/static/hero-cafe-cups.webp">
             <div class="hero-copy">
               <p class="eyebrow">Paper Cups</p>
               <h1>Paper cups, lids and cup carriers</h1>
@@ -176,7 +234,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               </div>
             </div>
           </div>
-          <div class="hero-slide" data-hero-slide style="--hero-image: url('/static/hero-restaurant-takeaway.png')">
+          <div class="hero-slide" data-hero-slide data-hero-image="/static/hero-restaurant-takeaway.webp">
             <div class="hero-copy">
               <p class="eyebrow">Take-out Packaging</p>
               <h1>Bowls, take-out boxes and paper bags</h1>
@@ -187,7 +245,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               </div>
             </div>
           </div>
-          <div class="hero-slide" data-hero-slide style="--hero-image: url('/static/hero-design-stickers.png')">
+          <div class="hero-slide" data-hero-slide data-hero-image="/static/hero-design-stickers.webp">
             <div class="hero-copy">
               <p class="eyebrow">Free Brand Design</p>
               <h1>Custom printed cups, labels and sushi boxes</h1>
@@ -215,16 +273,13 @@ Sitemap: {SITE_URL}/sitemap.xml
         </section>
 
         <section id="about" class="why-choose-section">
-          <div class="section-head">
-            <p class="eyebrow">Why Choose AUREA</p>
-            <h2>Built for busy cafes, foodservice buyers and growing packaging programs</h2>
-          </div>
-          <div class="why-choose-grid">
-            <article><strong>Bulk Pricing</strong><span>Factory-direct supply helps support competitive carton and pallet pricing.</span></article>
-            <article><strong>Fast Melbourne Delivery</strong><span>Local stock options for common SKUs and practical delivery planning.</span></article>
-            <article><strong>Reliable Supply</strong><span>Two-factory sourcing supports continuity across seasonal and contract demand.</span></article>
-            <article><strong>Cafe-focused Packaging</strong><span>Cups, lids, napkins and takeaway essentials built around daily service.</span></article>
-            <article><strong>Custom Packaging Support</strong><span>Logo placement, stickers, dielines and print-ready artwork support.</span></article>
+          <div class="partnership-banner">
+            <div class="partnership-copy">
+              <p class="eyebrow">Packaging Partnership</p>
+              <h2>Helping foodservice businesses grow with reliable packaging solutions.</h2>
+              <p>Supporting cafés, restaurants, takeaway operators and wholesale partners with dependable packaging supply.</p>
+              <a class="button primary" href="#products">Request a Quote</a>
+            </div>
           </div>
         </section>
 
@@ -236,6 +291,11 @@ Sitemap: {SITE_URL}/sitemap.xml
             let active = 0;
             const show = (index) => {{
               active = (index + slides.length) % slides.length;
+              const nextSlide = slides[active];
+              const heroImage = nextSlide.dataset.heroImage;
+              if (heroImage && !nextSlide.style.getPropertyValue("--hero-image")) {{
+                nextSlide.style.setProperty("--hero-image", `url('${{heroImage}}')`);
+              }}
               slides.forEach((slide, slideIndex) => slide.classList.toggle("is-active", slideIndex === active));
               dots.forEach((dot, dotIndex) => dot.classList.toggle("is-active", dotIndex === active));
             }};
@@ -283,9 +343,7 @@ Sitemap: {SITE_URL}/sitemap.xml
                 const boxes = Number.parseInt(input.value || "0", 10);
                 if (boxes > 0) {{
                   const id = input.dataset.productId;
-                  const noteInput = document.querySelector(`[data-product-note="${{id}}"]`);
-                  const note = noteInput ? noteInput.value.trim().replace(/[|:]/g, " ") : "";
-                  selected.push(`${{id}}:${{boxes}}:${{note}}`);
+                  selected.push(`${{id}}:${{boxes}}:`);
                 }}
               }});
 
@@ -330,7 +388,47 @@ Sitemap: {SITE_URL}/sitemap.xml
 
     def product_category_page(self, slug):
         category = category_lookup(slug)
-        if not category or category["href"] == "/#products":
+        if not category:
+            return self.redirect("/#product-categories")
+        if slug == "cups-cup-accessories":
+            product_cards = cup_accessories_cards()
+            filters = cups_filter_panel()
+            body = f"""
+            <section class="category-hero category-hero--cups">
+              <div>
+                <p class="eyebrow">Product Category</p>
+                <h1>Cups &amp; Cup Accessories</h1>
+              </div>
+            </section>
+            <section class="category-intro">
+              <p>Browse AUREA coffee cups, matching lids and cafe-ready carton options. Review pack details below, then request pricing through Quick Order.</p>
+            </section>
+            <section class="category-shop-layout">
+              {filters}
+              <div class="category-results">
+                <div class="category-results__bar">
+                  <span>{len(PUBLIC_PRODUCTS)} products</span>
+                  <label>
+                    Sort by
+                    <select aria-label="Sort products">
+                      <option>Best Match</option>
+                      <option>Size</option>
+                      <option>Wall Type</option>
+                    </select>
+                  </label>
+                </div>
+                <div class="category-sale-strip">
+                  <strong>Cafe supply made simple</strong>
+                  <span>Carton pricing confirmed after enquiry</span>
+                </div>
+                <div class="category-product-grid">
+                  {product_cards}
+                </div>
+              </div>
+            </section>
+            """
+            return self.respond(layout("Cups & Cup Accessories", body, self.is_authed()))
+        if category["href"] == "/#products":
             return self.redirect("/#products")
         body = f"""
         <section class="category-placeholder-page">
@@ -422,7 +520,7 @@ Sitemap: {SITE_URL}/sitemap.xml
         </div>
         <section class="panel narrow quote-panel">
           <div class="document-brand quote-brand">
-            <img src="/static/aurea-logo-light.png" alt="AUREA Packaging Supply Pty Ltd">
+            <img src="/static/aurea-logo-light.webp" alt="AUREA Packaging Supply Pty Ltd" loading="lazy" decoding="async">
           </div>
           <h1>Quick Order Enquiry</h1>
           <div class="quote-summary">

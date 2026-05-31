@@ -21,49 +21,49 @@ SEO_DESCRIPTION = (
     "Factory-direct sustainable food packaging, coffee cups, bags, containers and custom packaging "
     "for Australian foodservice, retail and hospitality businesses."
 )
-SEO_IMAGE = f"{SITE_URL}/static/hero-cups.png"
+SEO_IMAGE = f"{SITE_URL}/static/hero-cups.webp"
 PRODUCT_CATEGORIES = [
     {
         "title": "Cups & Cup Accessories",
         "slug": "cups-cup-accessories",
         "description": "Coffee cups, cold cups, lids and cup carriers for cafes and foodservice teams.",
-        "href": "/#products",
-        "image": "/static/images/categories/category-cups.png",
+        "href": "/products/cups-cup-accessories",
+        "image": "/static/images/categories/category-cups.webp",
     },
     {
         "title": "Food Containers",
         "slug": "food-containers",
         "description": "Takeaway containers, bowls, boxes, trays and clear-lid packaging options.",
         "href": "/products/food-containers",
-        "image": "/static/images/categories/category-food-containers.png",
+        "image": "/static/images/categories/category-food-containers.webp",
     },
     {
         "title": "Paper Bags",
         "slug": "paper-bags",
         "description": "Kraft, recycled and custom paper bags for takeaway, retail and delivery.",
         "href": "/products/paper-bags",
-        "image": "/static/images/categories/category-paper-bags.png",
+        "image": "/static/images/categories/category-paper-bags.webp",
     },
     {
         "title": "Napkins & Tissues",
         "slug": "napkins-tissues",
         "description": "Napkins, tissues and hygiene paper products for hospitality operations.",
         "href": "/products/napkins-tissues",
-        "image": "/static/images/categories/category-napkins.png",
+        "image": "/static/images/categories/category-napkins.webp",
     },
     {
         "title": "Straws & Accessories",
         "slug": "straws-accessories",
         "description": "Paper straws, eco alternatives, cutlery, sleeves and practical service accessories.",
         "href": "/products/straws-accessories",
-        "image": "/static/images/categories/category-straws.png",
+        "image": "/static/images/categories/category-straws.webp",
     },
     {
         "title": "Custom Packaging Solutions",
         "slug": "custom-packaging-solutions",
         "description": "Logo printing, stickers, labels, dielines and brand-ready packaging support.",
         "href": "/products/custom-packaging-solutions",
-        "image": "/static/images/categories/category-custom-packaging.png",
+        "image": "/static/images/categories/category-custom-packaging.webp",
     },
 ]
 PRODUCT_RANGE = [
@@ -107,7 +107,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
-        "image": "/static/single-wall-8oz.png",
+        "image": "/static/single-wall-8oz.webp",
         "quote_price": 49.90,
     },
     {
@@ -117,7 +117,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
-        "image": "/static/single-wall-12oz.png",
+        "image": "/static/single-wall-12oz.webp",
         "quote_price": 61.90,
     },
     {
@@ -127,7 +127,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
-        "image": "/static/single-wall-16oz.png",
+        "image": "/static/single-wall-16oz.webp",
         "quote_price": 79.90,
     },
     {
@@ -137,7 +137,7 @@ PUBLIC_PRODUCTS = [
         "type": "Single Wall compatible",
         "carton": "1000 lids per box",
         "lid": "Fits 8 oz, 12 oz and 16 oz cups",
-        "image": "/static/lid-90mm.png",
+        "image": "/static/lid-90mm.webp",
         "quote_price": 39.90,
     },
     {
@@ -147,7 +147,7 @@ PUBLIC_PRODUCTS = [
         "type": "Double Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
-        "image": "/static/double-wall-8oz.png",
+        "image": "/static/double-wall-8oz.webp",
         "quote_price": 45.00,
     },
     {
@@ -157,7 +157,7 @@ PUBLIC_PRODUCTS = [
         "type": "Double Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
-        "image": "/static/double-wall-12oz.png",
+        "image": "/static/double-wall-12oz.webp",
         "quote_price": 50.00,
     },
     {
@@ -167,18 +167,8 @@ PUBLIC_PRODUCTS = [
         "type": "Double Wall",
         "carton": "1000 cups per box",
         "lid": "90mm universal lid compatible",
-        "image": "/static/double-wall-16oz.png",
+        "image": "/static/double-wall-16oz.webp",
         "quote_price": 60.00,
-    },
-    {
-        "id": "DWLID",
-        "name": "90mm Plastic Lid",
-        "size": "90mm lids",
-        "type": "Double Wall compatible",
-        "carton": "1000 lids per box",
-        "lid": "Fits 8 oz, 12 oz and 16 oz cups",
-        "image": "/static/lid-90mm.png",
-        "quote_price": 45.00,
     },
 ]
 
@@ -283,13 +273,13 @@ def layout(title, body, authed=False, noindex=False):
       <meta name="google-site-verification" content="F7E9xybe9tWEfOtvIs2FOdnGqitnThBp62z9NdeDtuI" />
       {robots_meta}
       {seo_meta}
-      <link rel="icon" href="/static/aurea-logo.png">
+      <link rel="icon" href="/static/aurea-logo.webp">
       <link rel="stylesheet" href="/static/styles.css">
     </head>
     <body>
       <header class="topbar">
         <a class="brand" href="/">
-          <img class="brand-logo" src="/static/aurea-logo.png" alt="AUREA Packaging Supply Pty Ltd">
+          <img class="brand-logo" src="/static/aurea-logo.webp" alt="AUREA Packaging Supply Pty Ltd" decoding="async">
           <span><strong>AUREA</strong><small>Packaging Supply Pty Ltd</small></span>
         </a>
         <nav class="site-nav">
@@ -318,13 +308,6 @@ def layout(title, body, authed=False, noindex=False):
         <div>
           <h2>Products</h2>
           {footer_products}
-        </div>
-        <div>
-          <h2>Contact</h2>
-          <a href="tel:{PUBLIC_PHONE_TEL}">{PUBLIC_PHONE_DISPLAY}</a>
-          <a href="mailto:{PUBLIC_EMAIL}">{PUBLIC_EMAIL}</a>
-          <a href="https://{PUBLIC_WEBSITE}">{PUBLIC_WEBSITE}</a>
-          <span>{PUBLIC_LOCATION}</span>
         </div>
       </footer>
     </body>
@@ -1101,8 +1084,8 @@ def quick_order_rows():
         <article class="qo-card" data-product-row>
           <span class="qo-card__badge">&#10003; Added</span>
           <div class="qo-card__img-wrap">
-            <img class="qo-card__img" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}">
-            <img class="qo-card__preview" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])} enlarged preview" aria-hidden="true">
+            <img class="qo-card__img" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}" loading="lazy" decoding="async">
+            <img class="qo-card__preview" src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])} enlarged preview" aria-hidden="true" loading="lazy" decoding="async">
           </div>
           <div class="qo-card__body">
             <p class="qo-card__type">{esc(product["type"])}</p>
@@ -1114,10 +1097,6 @@ def quick_order_rows():
             <label class="qo-card__label">
               <span>Boxes</span>
               <input class="qo-card__qty" type="number" min="0" step="1" inputmode="numeric" value="0" data-product-id="{product_id}">
-            </label>
-            <label class="qo-card__label">
-              <span>Note (optional)</span>
-              <input class="qo-card__note" type="text" placeholder="e.g. custom print" data-product-note="{product_id}">
             </label>
           </div>
         </article>
@@ -1240,7 +1219,7 @@ def quotation_page(quote_number, quote_date, form_data, selected, email_sent=Fal
         <header class="quotation-header">
           <div>
             <div class="document-brand">
-              <img src="/static/aurea-logo-light.png" alt="AUREA Packaging Supply Pty Ltd">
+              <img src="/static/aurea-logo-light.webp" alt="AUREA Packaging Supply Pty Ltd" loading="lazy" decoding="async">
             </div>
             <h1>Quotation Draft</h1>
             <p>This is an indicative quotation. Final price is subject to stock availability, delivery area and order confirmation.</p>
