@@ -11,6 +11,7 @@ SECRET = os.environ.get("CUPFLOW_SECRET", "change-this-local-dev-secret")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 SITE_URL = "https://aureapackaging.com.au"
+ASSET_VERSION = "20260531-bbc8be2"
 PUBLIC_PHONE_DISPLAY = "0497 278 099"
 PUBLIC_PHONE_TEL = "0497278099"
 PUBLIC_EMAIL = "qiuchen.wang@bilinstone.com"
@@ -274,7 +275,7 @@ def layout(title, body, authed=False, noindex=False):
       {robots_meta}
       {seo_meta}
       <link rel="icon" href="/static/aurea-logo.webp">
-      <link rel="stylesheet" href="/static/styles.css">
+      <link rel="stylesheet" href="/static/styles.css?v={ASSET_VERSION}">
     </head>
     <body>
       <header class="topbar">
