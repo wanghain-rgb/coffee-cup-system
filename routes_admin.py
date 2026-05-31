@@ -2,11 +2,13 @@ from collections import defaultdict
 from datetime import date
 from http.cookies import SimpleCookie
 from urllib.parse import parse_qs, urlparse
+import logging
 import mimetypes
+
+logger = logging.getLogger(__name__)
 import os
 import sys
 import time
-import traceback
 
 from db import db
 from utils import *
@@ -275,9 +277,8 @@ class AdminRoutesMixin:
                         )
                         conn.commit()
                     return self.redirect("/admin/company?saved=company")
-                except Exception as exc:
-                    print(f"Failed to save company master: {exc}")
-                    traceback.print_exc()
+                except Exception:
+                    logger.exception("Failed to save company master")
                     error = '<p class="alert">Company details could not be saved. Please try again.</p>'
                     c = f
         else:

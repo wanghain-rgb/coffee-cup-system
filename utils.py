@@ -19,6 +19,8 @@ def safe_float(value, default=0.0):
         raise ValueError(f"Expected a number, got: {value!r}")
 
 APP_NAME = "CupFlow"
+GST_RATE = 0.10
+CSRF_TOKEN_LENGTH = 32
 # Render's normal/free filesystem is ephemeral. If this SQLite file is stored
 # there, business data can be lost on redeploy/restart/spin-down. Use
 # PostgreSQL or a Render persistent disk for production data.
@@ -281,7 +283,7 @@ def verify(signed, max_age=None):
 
 def make_csrf_token(session_sig):
     digest = hmac.new(SECRET.encode(), f"csrf:{session_sig}".encode(), "sha256").hexdigest()
-    return digest[:32]
+    return digest[:CSRF_TOKEN_LENGTH]
 
 
 def layout(title, body, authed=False, noindex=False, quote_cart_count=0):
@@ -492,7 +494,7 @@ def parse_invoice_lines(conn, form_data, max_lines=8):
             continue
         tax_type = product["tax_type"] or "GST"
         line_subtotal = qty * unit_price
-        line_gst = line_subtotal * 0.10 if tax_type == "GST" else 0.0
+        line_gst = line_subtotal * GST_RATE if tax_type == "GST" else 0.0
         selected_lines.append(
             {
                 "product_id": int(product_id),
@@ -599,7 +601,7 @@ def create_invoice_from_sales_order(conn, sales_order_id):
     for line in sales_lines:
         tax_type = line["tax_type"] or "GST"
         line_subtotal = float(line["qty_cartons"] or 0) * float(line["sell_price"] or 0)
-        line_gst = line_subtotal * 0.10 if tax_type == "GST" else 0.0
+        line_gst = line_subtotal * GST_RATE if tax_type == "GST" else 0.0
         selected_lines.append(
             {
                 "product_id": line["product_id"],
@@ -816,7 +818,7 @@ def parse_po_lines(conn, form_data, max_lines=8):
             continue
         tax_type = product["tax_type"] or "GST"
         line_subtotal = qty * unit_price
-        line_gst = line_subtotal * 0.10 if tax_type == "GST" else 0.0
+        line_gst = line_subtotal * GST_RATE if tax_type == "GST" else 0.0
         selected_lines.append(
             {
                 "product_id": int(product_id),

@@ -3,6 +3,8 @@ from datetime import date
 from urllib.parse import parse_qs, urlparse
 
 from db import db
+
+CAROUSEL_INTERVAL_MS = 4000
 from email_utils import send_quotation_emails
 from utils import *
 
@@ -307,7 +309,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               dots.forEach((dot, dotIndex) => dot.classList.toggle("is-active", dotIndex === active));
             }};
             dots.forEach((dot, index) => dot.addEventListener("click", () => show(index)));
-            window.setInterval(() => show(active + 1), 4000);
+            window.setInterval(() => show(active + 1), {CAROUSEL_INTERVAL_MS});
           }})();
         </script>
 
