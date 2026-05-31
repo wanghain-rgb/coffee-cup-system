@@ -3104,12 +3104,15 @@ th {
   font: inherit;
 }
 
-.category-product-card__cart a {
+.category-product-card__cart a,
+.category-product-card__cart button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 40px;
   padding: 0 16px;
+  border: 0;
+  border-radius: 0;
   color: #fff;
   background: #3f3f3f;
   font-size: 11px;
@@ -3117,6 +3120,38 @@ th {
   letter-spacing: 0.04em;
   text-decoration: none;
   text-transform: uppercase;
+}
+
+.category-product-card__cart button:disabled {
+  opacity: 0.68;
+}
+
+.quote-add-status {
+  min-height: 16px;
+  color: var(--green-950);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quote-cart-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.quote-cart-summary strong {
+  color: var(--green-950);
+  font-size: 22px;
+}
+
+.quote-cart-summary span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.quote-cart-table input {
+  max-width: 96px;
 }
 
 .vision-section {

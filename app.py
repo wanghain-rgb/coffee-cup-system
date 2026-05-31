@@ -26,7 +26,17 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         path = parsed.path
         if self.command == "POST":
             form_data = self.form()
-            if not hmac.compare_digest(form_data.get("_csrf", ""), self.csrf_token()):
+            public_quote_cart_add = (
+                path == "/products/cups-cup-accessories"
+                and form_data.get("action") == "add_to_quote"
+            )
+            if not public_quote_cart_add and not hmac.compare_digest(form_data.get("_csrf", ""), self.csrf_token()):
+                if self.headers.get("X-Requested-With") == "XMLHttpRequest":
+                    return self.respond(
+                        '{"ok": false, "message": "Invalid request. Please refresh the page and try again."}',
+                        403,
+                        content_type="application/json",
+                    )
                 return self.respond("Invalid request. Please go back and try again.", 403, content_type="text/plain")
         if path.startswith("/static/"):
             return self.static_file(path)
@@ -67,6 +77,7 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         routes = {
             "/": self.catalogue,
             "/quote": self.quote,
+            "/quote-cart": self.quote_cart,
             "/robots.txt": self.robots_txt,
             "/sitemap.xml": self.sitemap_xml,
             "/admin/login": self.login,
@@ -122,6 +133,20 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
     def csrf_input(self):
         return f'<input type="hidden" name="_csrf" value="{self.csrf_token()}">'
 
+    def quote_cart_data(self):
+        signed = SimpleCookie(self.headers.get("Cookie")).get("quote_cart")
+        raw = verify(signed.value) if signed else ""
+        return parse_quote_cart(raw or "")
+
+    def quote_cart_cookie(self, cart, max_age=None):
+        secure = "; Secure" if DATABASE_URL else ""
+        value = sign(quote_cart_value(cart))
+        age = f"; Max-Age={max_age}" if max_age is not None else ""
+        return f"quote_cart={value}{age}; HttpOnly; SameSite=Lax; Path=/{secure}"
+
+    def quote_cart_count(self):
+        return quote_cart_count(self.quote_cart_data())
+
     def respond(self, content, status=200, content_type="text/html", cookies=None):
         self.send_response(status)
         self.send_header("Content-Type", f"{content_type}; charset=utf-8")
@@ -131,9 +156,12 @@ class App(PublicRoutesMixin, AdminRoutesMixin, ProductRoutesMixin, CustomerRoute
         self.end_headers()
         self.wfile.write(content.encode("utf-8"))
 
-    def redirect(self, location):
+    def redirect(self, location, cookies=None):
         self.send_response(303)
         self.send_header("Location", location)
+        if cookies:
+            for cookie in cookies:
+                self.send_header("Set-Cookie", cookie)
         self.end_headers()
 
     def admin_purchase_orders(self):

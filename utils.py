@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 import html
 import hmac
 import os
@@ -187,6 +187,42 @@ def display_date(value):
         return str(value)
 
 
+def display_melbourne_datetime(value):
+    if not value:
+        return ""
+    if isinstance(value, datetime):
+        dt = value
+    else:
+        raw = str(value).strip()
+        try:
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            try:
+                dt = datetime.strptime(raw[:19], "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return raw
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    utc_dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    melbourne_dt = (utc_dt + melbourne_utc_offset(utc_dt)).replace(tzinfo=None)
+    return melbourne_dt.strftime("%d/%m/%Y %-I:%M %p") if os.name != "nt" else melbourne_dt.strftime("%d/%m/%Y %#I:%M %p")
+
+
+def first_sunday(year, month):
+    day = date(year, month, 1)
+    days_until_sunday = (6 - day.weekday()) % 7
+    return day + timedelta(days=days_until_sunday)
+
+
+def melbourne_utc_offset(utc_dt):
+    year = utc_dt.year
+    dst_start = datetime.combine(first_sunday(year, 10), datetime.min.time()).replace(hour=2) - timedelta(hours=10)
+    dst_end = datetime.combine(first_sunday(year, 4), datetime.min.time()).replace(hour=3) - timedelta(hours=11)
+    if utc_dt >= dst_start or utc_dt < dst_end:
+        return timedelta(hours=11)
+    return timedelta(hours=10)
+
+
 def esc(value):
     return html.escape("" if value is None else str(value))
 
@@ -209,7 +245,7 @@ def make_csrf_token(session_sig):
     return digest[:32]
 
 
-def layout(title, body, authed=False, noindex=False):
+def layout(title, body, authed=False, noindex=False, quote_cart_count=0):
     admin_links = ""
     if authed:
         admin_links = """
@@ -227,7 +263,7 @@ def layout(title, body, authed=False, noindex=False):
         <a href="/admin/logout">Logout</a>
         """
     else:
-        admin_links = '<a href="/admin/login">Admin</a>'
+        admin_links = ""
     product_nav = "".join(
         f'<a href="{esc(category["href"])}">{esc(category["title"])}</a>'
         for category in PRODUCT_CATEGORIES
@@ -291,7 +327,7 @@ def layout(title, body, authed=False, noindex=False):
               {product_nav}
             </div>
           </div>
-          <a href="/#products">Quick Order</a>
+          <a href="/quote-cart" data-quote-cart-link>Quote Cart ({esc(quote_cart_count)})</a>
           <a href="/#about">About Us</a>
           <a href="/#contact">Contact</a>
           <a class="nav-cta" href="/quote">Request Quote</a>
@@ -1077,6 +1113,81 @@ def product_by_id():
     return {product["id"]: product for product in PUBLIC_PRODUCTS}
 
 
+def quote_product_name(product):
+    name = (product.get("name") or "").strip()
+    wall_type = (product.get("type") or "").replace(" compatible", "").strip()
+    if wall_type and name.lower().startswith(wall_type.lower()):
+        name = name[len(wall_type):].strip()
+    return name or (product.get("name") or "")
+
+
+def quote_carton_text(product):
+    carton = (product.get("carton") or "").replace(" per box", "/carton").replace(" per carton", "/carton")
+    return carton
+
+
+def quote_lid_text(product):
+    lid = product.get("lid") or ""
+    if "universal lid compatible" in lid.lower():
+        return lid.replace(" universal lid compatible", " lid compatible")
+    return lid
+
+
+def parse_quote_cart(value):
+    products = product_by_id()
+    cart = {}
+    for item in (value or "").split("|"):
+        if ":" not in item:
+            continue
+        product_id, qty_value = item.split(":", 1)
+        if product_id not in products:
+            continue
+        try:
+            qty = int(qty_value)
+        except ValueError:
+            continue
+        if qty > 0:
+            cart[product_id] = cart.get(product_id, 0) + qty
+    return cart
+
+
+def quote_cart_value(cart):
+    parts = []
+    for product_id in sorted(cart):
+        qty = int(cart.get(product_id) or 0)
+        if qty > 0 and product_id in product_by_id():
+            parts.append(f"{product_id}:{qty}")
+    return "|".join(parts)
+
+
+def quote_cart_items(cart):
+    products = product_by_id()
+    items = []
+    for product_id, qty in cart.items():
+        product = products.get(product_id)
+        if product and int(qty or 0) > 0:
+            items.append({"product": product, "qty": int(qty)})
+    return items
+
+
+def quote_cart_count(cart):
+    return len([qty for qty in cart.values() if int(qty or 0) > 0])
+
+
+def quote_cart_total_cartons(cart):
+    return sum(int(qty or 0) for qty in cart.values())
+
+
+def quote_cart_lines_text(cart):
+    lines = []
+    for item in quote_cart_items(cart):
+        product = item["product"]
+        lines.append(
+            f'{product["id"]} - {quote_product_name(product)} - {product["size"]} - {item["qty"]} cartons'
+        )
+    return "\n".join(lines)
+
+
 def quick_order_rows():
     rows = ""
     for product in PUBLIC_PRODUCTS:
@@ -1150,8 +1261,8 @@ def quick_order_table(selected):
         return """
         <div class="quote-empty">
           <strong>No products selected yet.</strong>
-          <p>Please choose at least one product from Quick Order so we can prepare the right final price.</p>
-          <a class="button primary" href="/#products">Choose Products</a>
+          <p>Please choose at least one product so we can prepare the right final price.</p>
+          <a class="button primary" href="/products/cups-cup-accessories">Choose Products</a>
         </div>
         """
     rows = ""

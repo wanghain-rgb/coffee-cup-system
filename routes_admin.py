@@ -277,7 +277,7 @@ class AdminRoutesMixin:
             rows = conn.execute("SELECT * FROM quote_requests ORDER BY created_at DESC").fetchall()
         quote_rows = [
             [
-                esc(r["created_at"]),
+                esc(display_melbourne_datetime(r["created_at"])),
                 esc(r["status"]),
                 esc(r["business_name"]),
                 esc(r["contact_name"]),

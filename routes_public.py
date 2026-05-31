@@ -1,3 +1,4 @@
+import json
 from datetime import date
 from urllib.parse import parse_qs, urlparse
 
@@ -119,28 +120,35 @@ def certification_logo_cards():
     return cards
 
 
-def cup_accessories_cards():
+def cup_accessories_cards(csrf_html=""):
     cards = ""
     sorted_products = sorted(PUBLIC_PRODUCTS, key=lambda product: 1 if "lid" in product["name"].lower() else 0)
     for product in sorted_products:
         product_id = esc(product["id"])
+        display_name = quote_product_name(product)
+        carton_text = quote_carton_text(product)
+        lid_text = quote_lid_text(product)
         cards += f"""
         <article class="category-product-card">
-          <a class="category-product-card__image" href="/#products" aria-label="Quote {esc(product["name"])} {esc(product["size"])}">
+          <a class="category-product-card__image" href="/products/cups-cup-accessories" aria-label="Quote {esc(display_name)} {esc(product["size"])}">
             <img src="{esc(product["image"])}" alt="{esc(product["name"])} {esc(product["size"])}" loading="lazy" decoding="async">
           </a>
           <div class="category-product-card__body">
             <span class="category-product-card__tag">{esc(product["type"])}</span>
-            <h3>{esc(product["name"])}</h3>
+            <h3>{esc(display_name)}</h3>
             <p class="category-product-card__size">{esc(product["size"])}</p>
-            <p>{esc(product["carton"])} &middot; {esc(product["lid"])}</p>
-            <div class="category-product-card__cart">
+            <p>{esc(carton_text)} &middot; {esc(lid_text)}</p>
+            <form class="category-product-card__cart" method="post" data-quote-add-form>
+              {csrf_html}
+              <input type="hidden" name="action" value="add_to_quote">
+              <input type="hidden" name="product_id" value="{product_id}">
               <label for="category_qty_{product_id}">Qty of Cartons</label>
               <div>
-                <input id="category_qty_{product_id}" type="number" min="0" step="1" inputmode="numeric" aria-label="Quantity of cartons for {esc(product["name"])} {esc(product["size"])}">
-                <a href="/#products">Add to Cart</a>
+                <input id="category_qty_{product_id}" name="quantity" type="number" min="1" step="1" inputmode="numeric" value="1" aria-label="Quantity of cartons for {esc(display_name)} {esc(product["size"])}">
+                <button type="submit">Add to Quote</button>
               </div>
-            </div>
+              <span class="quote-add-status" data-quote-add-status aria-live="polite"></span>
+            </form>
           </div>
         </article>
         """
@@ -170,7 +178,7 @@ def cups_filter_panel():
       <div class="category-filter-help">
         <strong>I want to</strong>
         <p>Review cup sizes, wall types and lid compatibility before requesting a quote.</p>
-        <a href="/#products">Quick Order</a>
+        <a href="/quote-cart">Quote Cart</a>
       </div>
       {groups}
     </aside>
@@ -196,7 +204,6 @@ Sitemap: {SITE_URL}/sitemap.xml
         self.respond(content, content_type="application/xml")
 
     def catalogue(self):
-        quick_rows = quick_order_rows()
         product_category_cards = category_cards()
         certification_cards = certification_logo_cards()
         body = f"""
@@ -207,7 +214,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               <h1>Full product range from both factories</h1>
               <p>Paper cups, bowls, take-out boxes, bags, labels and sustainable packaging for every business.</p>
               <div class="hero-actions">
-                <a class="button primary" href="#products">Request a Quote</a>
+                <a class="button primary" href="/products/cups-cup-accessories">Start Quote Cart</a>
                 <a class="button ghost" href="#product-categories">View Categories</a>
               </div>
             </div>
@@ -218,7 +225,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               <h1>Local stock. Same-week dispatch.</h1>
               <p>Factory-direct pricing with Australian warehouse speed and replenishment planning support.</p>
               <div class="hero-actions">
-                <a class="button primary" href="#products">Plan Supply</a>
+                <a class="button primary" href="/products/cups-cup-accessories">Plan Supply</a>
                 <a class="button ghost" href="#contact">Delivery Enquiry</a>
               </div>
             </div>
@@ -229,7 +236,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               <h1>Paper cups, lids and cup carriers</h1>
               <p>Single, double and ripple wall options with PLA or PE materials and custom branding support.</p>
               <div class="hero-actions">
-                <a class="button primary" href="#products">Shop Cafe SKUs</a>
+                <a class="button primary" href="/products/cups-cup-accessories">Quote Cafe SKUs</a>
                 <a class="button ghost" href="#contact">Ask for Samples</a>
               </div>
             </div>
@@ -278,7 +285,7 @@ Sitemap: {SITE_URL}/sitemap.xml
               <p class="eyebrow">Packaging Partnership</p>
               <h2>Helping foodservice businesses grow with reliable packaging solutions.</h2>
               <p>Supporting cafés, restaurants, takeaway operators and wholesale partners with dependable packaging supply.</p>
-              <a class="button primary" href="#products">Request a Quote</a>
+              <a class="button primary" href="/products/cups-cup-accessories">Add Products to Quote</a>
             </div>
           </div>
         </section>
@@ -300,65 +307,9 @@ Sitemap: {SITE_URL}/sitemap.xml
               dots.forEach((dot, dotIndex) => dot.classList.toggle("is-active", dotIndex === active));
             }};
             dots.forEach((dot, index) => dot.addEventListener("click", () => show(index)));
-            window.setInterval(() => show(active + 1), 5200);
+            window.setInterval(() => show(active + 1), 4000);
           }})();
         </script>
-
-        <section id="products" class="qo-section">
-          <div class="section-head">
-            <p class="eyebrow">Featured Products</p>
-            <h2>Coffee cup essentials you can quote directly</h2>
-            <p>Review product images and carton details, then enter quantities on the same card. Pricing appears after you submit your enquiry details.</p>
-          </div>
-          <form class="quick-order-form" action="/quote" method="get">
-            <input type="hidden" name="items" id="quick_order_items">
-            <div class="qo-grid">
-              {quick_rows}
-            </div>
-            <p class="quick-warning" id="quick_order_warning" role="alert">Please add a quantity to at least one product before requesting a price.</p>
-            <div class="qo-footer">
-              <span>No payment or checkout &mdash; we confirm final price with you directly.</span>
-              <button class="button primary qo-submit" type="submit">Request Best Price &rarr;</button>
-            </div>
-          </form>
-          <script>
-            const quickOrderForm = document.querySelector(".quick-order-form");
-            const quickOrderItems = document.getElementById("quick_order_items");
-            const quickOrderWarning = document.getElementById("quick_order_warning");
-            const quickOrderQuantityInputs = document.querySelectorAll("[data-product-id]");
-
-            quickOrderQuantityInputs.forEach((input) => {{
-              input.addEventListener("input", () => {{
-                const row = input.closest("[data-product-row]");
-                const boxes = Number.parseInt(input.value || "0", 10);
-                if (row) {{
-                  row.classList.toggle("is-selected", boxes > 0);
-                }}
-              }});
-            }});
-
-            quickOrderForm.addEventListener("submit", (event) => {{
-              const selected = [];
-              quickOrderQuantityInputs.forEach((input) => {{
-                const boxes = Number.parseInt(input.value || "0", 10);
-                if (boxes > 0) {{
-                  const id = input.dataset.productId;
-                  selected.push(`${{id}}:${{boxes}}:`);
-                }}
-              }});
-
-              if (!selected.length) {{
-                event.preventDefault();
-                quickOrderWarning.classList.add("show");
-                quickOrderWarning.scrollIntoView({{ behavior: "smooth", block: "center" }});
-                return;
-              }}
-
-              quickOrderWarning.classList.remove("show");
-              quickOrderItems.value = selected.join("|");
-            }});
-          </script>
-        </section>
 
         <section id="certifications" class="cert-logo-section">
           <div class="cert-logo-intro">
@@ -384,14 +335,55 @@ Sitemap: {SITE_URL}/sitemap.xml
         </section>
 
         """
-        self.respond(layout("Product Catalogue", body, self.is_authed()))
+        self.respond(layout("Product Catalogue", body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
 
     def product_category_page(self, slug):
         category = category_lookup(slug)
         if not category:
             return self.redirect("/#product-categories")
         if slug == "cups-cup-accessories":
-            product_cards = cup_accessories_cards()
+            if self.command == "POST":
+                f = self.form()
+                if f.get("action") == "add_to_quote":
+                    wants_json = self.headers.get("X-Requested-With") == "XMLHttpRequest"
+                    products = product_by_id()
+                    product_id = f.get("product_id")
+                    try:
+                        qty = int(f.get("quantity") or 1)
+                    except ValueError:
+                        qty = 0
+                    if product_id not in products or qty < 1:
+                        if wants_json:
+                            return self.respond(
+                                json.dumps({"ok": False, "message": "Please enter a carton quantity of at least 1."}),
+                                status=400,
+                                content_type="application/json",
+                            )
+                        return self.redirect("/products/cups-cup-accessories?error=quantity")
+                    cart = self.quote_cart_data()
+                    cart[product_id] = int(cart.get(product_id, 0)) + qty
+                    cookie = self.quote_cart_cookie(cart)
+                    if wants_json:
+                        return self.respond(
+                            json.dumps({
+                                "ok": True,
+                                "message": "Added to Quote Cart.",
+                                "quoteCartCount": quote_cart_count(cart),
+                            }),
+                            content_type="application/json",
+                            cookies=[cookie],
+                        )
+                    return self.redirect(
+                        "/products/cups-cup-accessories?added=1",
+                        cookies=[cookie],
+                    )
+            notice = ""
+            query = parse_qs(urlparse(self.path).query)
+            if query.get("added", [""])[0]:
+                notice = '<p class="notice">Added to Quote Cart.</p>'
+            elif query.get("error", [""])[0] == "quantity":
+                notice = '<p class="alert">Please enter a carton quantity of at least 1.</p>'
+            product_cards = cup_accessories_cards(self.csrf_input())
             filters = cups_filter_panel()
             body = f"""
             <section class="category-hero category-hero--cups">
@@ -401,8 +393,9 @@ Sitemap: {SITE_URL}/sitemap.xml
               </div>
             </section>
             <section class="category-intro">
-              <p>Browse AUREA coffee cups, matching lids and cafe-ready carton options. Review pack details below, then request pricing through Quick Order.</p>
+              <p>Browse AUREA coffee cups, matching lids and cafe-ready carton options. Add products to your Quote Cart and send one B2B enquiry.</p>
             </section>
+            {notice}
             <section class="category-shop-layout">
               {filters}
               <div class="category-results">
@@ -419,17 +412,57 @@ Sitemap: {SITE_URL}/sitemap.xml
                 </div>
                 <div class="category-sale-strip">
                   <strong>Cafe supply made simple</strong>
-                  <span>Carton pricing confirmed after enquiry</span>
+                  <span>Carton pricing confirmed after quote request</span>
                 </div>
                 <div class="category-product-grid">
                   {product_cards}
                 </div>
               </div>
             </section>
+            <script>
+              (() => {{
+                const forms = Array.from(document.querySelectorAll("[data-quote-add-form]"));
+                const cartLink = document.querySelector("[data-quote-cart-link]");
+                if (!forms.length || !window.fetch || !window.FormData) return;
+                forms.forEach((form) => {{
+                  form.addEventListener("submit", async (event) => {{
+                    event.preventDefault();
+                    const button = form.querySelector("button[type='submit']");
+                    const status = form.querySelector("[data-quote-add-status]");
+                    if (button) button.disabled = true;
+                    if (status) status.textContent = "";
+                    try {{
+                      const response = await fetch(window.location.pathname, {{
+                        method: "POST",
+                        body: new URLSearchParams(new FormData(form)),
+                        headers: {{
+                          "Content-Type": "application/x-www-form-urlencoded",
+                          "X-Requested-With": "XMLHttpRequest"
+                        }},
+                        credentials: "same-origin"
+                      }});
+                      const contentType = response.headers.get("content-type") || "";
+                      const result = contentType.includes("application/json")
+                        ? await response.json()
+                        : {{ok: false, message: await response.text()}};
+                      if (!response.ok || !result.ok) throw new Error(result.message || "Unable to add product.");
+                      if (cartLink && Number.isInteger(result.quoteCartCount)) {{
+                        cartLink.textContent = `Quote Cart (${{result.quoteCartCount}})`;
+                      }}
+                      if (status) status.textContent = result.message || "Added to Quote Cart.";
+                    }} catch (error) {{
+                      if (status) status.textContent = error.message || "Unable to add product.";
+                    }} finally {{
+                      if (button) button.disabled = false;
+                    }}
+                  }});
+                }});
+              }})();
+            </script>
             """
-            return self.respond(layout("Cups & Cup Accessories", body, self.is_authed()))
+            return self.respond(layout("Cups & Cup Accessories", body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
         if category["href"] == "/#products":
-            return self.redirect("/#products")
+            return self.redirect("/products/cups-cup-accessories")
         body = f"""
         <section class="category-placeholder-page">
           <div class="category-placeholder__image">
@@ -442,12 +475,175 @@ Sitemap: {SITE_URL}/sitemap.xml
             <p>{esc(category["description"])} Product details, pack sizes and image galleries will be added here as the range is finalised.</p>
             <div class="hero-actions">
               <a class="button primary" href="/#contact">Contact Us</a>
-              <a class="button ghost" href="/#products">Quick Order</a>
+              <a class="button ghost" href="/quote-cart">Quote Cart</a>
             </div>
           </div>
         </section>
         """
-        self.respond(layout(category["title"], body, self.is_authed()))
+        self.respond(layout(category["title"], body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
+
+    def quote_cart(self):
+        notice = ""
+        query = parse_qs(urlparse(self.path).query)
+        if query.get("submitted", [""])[0]:
+            body = f"""
+            <section class="section-head"><h1>Quote Request Sent</h1><p>Thank you. AUREA will review your selected products and contact you shortly.</p></section>
+            <section class="panel quote-cart-success">
+              <strong>Quote request submitted successfully.</strong>
+              <p>Your Quote Cart has been cleared for the next request.</p>
+              <div class="form-actions">
+                <a class="button primary" href="/products/cups-cup-accessories">Start Another Quote Cart</a>
+                <a class="button secondary" href="/">Back to Home</a>
+              </div>
+            </section>
+            """
+            return self.respond(layout("Quote Request Sent", body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
+        elif query.get("updated", [""])[0]:
+            notice = '<p class="notice">Quote Cart updated.</p>'
+        elif query.get("removed", [""])[0]:
+            notice = '<p class="notice">Quote Cart line removed.</p>'
+        elif query.get("error", [""])[0] == "details":
+            notice = '<p class="alert">Please enter business name, contact name, email and phone before submitting.</p>'
+        elif query.get("error", [""])[0] == "empty":
+            notice = '<p class="alert">Please add at least one product before submitting a quote request.</p>'
+
+        cart = self.quote_cart_data()
+        products = product_by_id()
+
+        if self.command == "POST":
+            f = self.form()
+            action = f.get("action")
+            product_id = f.get("product_id")
+            if action == "update":
+                updated = {}
+                for key, value in f.items():
+                    if not key.startswith("qty_"):
+                        continue
+                    item_id = key.removeprefix("qty_")
+                    if item_id not in products:
+                        continue
+                    try:
+                        qty = int(value or 0)
+                    except ValueError:
+                        qty = 0
+                    if qty > 0:
+                        updated[item_id] = qty
+                return self.redirect("/quote-cart?updated=1", cookies=[self.quote_cart_cookie(updated)])
+            if action == "remove":
+                if product_id in cart:
+                    cart.pop(product_id)
+                return self.redirect("/quote-cart?removed=1", cookies=[self.quote_cart_cookie(cart)])
+            if action == "submit":
+                if not cart:
+                    cart = parse_quote_cart(verify(f.get("cart_snapshot")) or "")
+                items = quote_cart_items(cart)
+                if not items:
+                    return self.redirect("/quote-cart?error=empty")
+                required = ["business_name", "contact_name", "email", "phone"]
+                if any(not (f.get(field) or "").strip() for field in required):
+                    return self.redirect("/quote-cart?error=details")
+                line_text = quote_cart_lines_text(cart)
+                customer_notes = f.get("notes") or ""
+                message = line_text
+                if customer_notes:
+                    message = f"{message}\n\nCustomer notes: {customer_notes}"
+                item_count = quote_cart_count(cart)
+                total_cartons = quote_cart_total_cartons(cart)
+                with db() as conn:
+                    conn.execute(
+                        """
+                        INSERT INTO quote_requests
+                        (business_name, contact_name, email, phone, product_interest, monthly_volume, message)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            f.get("business_name"),
+                            f.get("contact_name"),
+                            f.get("email"),
+                            f.get("phone"),
+                            f"{item_count} quote-cart items",
+                            f"Total {total_cartons} cartons",
+                            message,
+                        ),
+                    )
+                return self.redirect("/quote-cart?submitted=1", cookies=[self.quote_cart_cookie({}, max_age=0)])
+
+        items = quote_cart_items(cart)
+        if items:
+            rows = ""
+            for item in items:
+                product = item["product"]
+                product_id = esc(product["id"])
+                rows += f"""
+                <tr>
+                  <td>{product_id}</td>
+                  <td>{esc(quote_product_name(product))}</td>
+                  <td>{esc(product["size"])}</td>
+                  <td><input form="quote-cart-update-form" name="qty_{product_id}" type="number" min="0" step="1" value="{esc(item["qty"])}" aria-label="Cartons for {esc(quote_product_name(product))}"></td>
+                  <td>
+                    <form method="post" class="inline-form">
+                      {self.csrf_input()}
+                      <input type="hidden" name="action" value="remove">
+                      <input type="hidden" name="product_id" value="{product_id}">
+                      <button class="link-button" type="submit">Remove</button>
+                    </form>
+                  </td>
+                </tr>
+                """
+            cart_table = f"""
+            <form id="quote-cart-update-form" method="post" class="quote-cart-update">
+              {self.csrf_input()}
+              <input type="hidden" name="action" value="update">
+            </form>
+            <div class="table-wrap quote-cart-table">
+              <table>
+                <thead><tr><th>Code</th><th>Product</th><th>Size</th><th>Cartons</th><th>Action</th></tr></thead>
+                <tbody>{rows}</tbody>
+              </table>
+            </div>
+            <div class="form-actions">
+              <button form="quote-cart-update-form" class="button secondary" type="submit">Update Quantities</button>
+              <a class="button secondary" href="/products/cups-cup-accessories">Add More Products</a>
+            </div>
+            """
+            submit_disabled = ""
+        else:
+            cart_table = """
+            <section class="panel">
+              <div class="quote-empty">
+                <strong>Your Quote Cart is empty.</strong>
+                <p>Add products from Cups & Cup Accessories to build a quote request.</p>
+                <a class="button primary" href="/products/cups-cup-accessories">Add Products to Quote</a>
+              </div>
+            </section>
+            """
+            submit_disabled = "disabled"
+
+        total_cartons = quote_cart_total_cartons(cart)
+        body = f"""
+        <section class="section-head"><h1>Quote Cart</h1><p>Review carton quantities and send one B2B quote request to AUREA.</p></section>
+        {notice}
+        <section class="panel quote-cart-summary">
+          <strong>{esc(quote_cart_count(cart))} items</strong>
+          <span>Total {esc(total_cartons)} cartons</span>
+        </section>
+        {cart_table}
+        <section class="panel">
+          <h2>Submit Quote Request</h2>
+          <form method="post" class="form grid-form">
+            {self.csrf_input()}
+            <input type="hidden" name="action" value="submit">
+            <input type="hidden" name="cart_snapshot" value="{esc(sign(quote_cart_value(cart)))}">
+            <label>Business name<input name="business_name" required {submit_disabled}></label>
+            <label>Contact person<input name="contact_name" required {submit_disabled}></label>
+            <label>Email<input name="email" type="email" required {submit_disabled}></label>
+            <label>Phone<input name="phone" required {submit_disabled}></label>
+            <label>Notes<textarea name="notes" rows="3" {submit_disabled}></textarea></label>
+            <button class="button primary" type="submit" {submit_disabled}>Submit Quote Request</button>
+          </form>
+        </section>
+        """
+        self.respond(layout("Quote Cart", body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
 
     def quote(self):
         if self.command == "POST":
@@ -459,11 +655,11 @@ Sitemap: {SITE_URL}/sitemap.xml
                   <div class="quote-empty">
                     <strong>No products selected yet.</strong>
                     <p>Please choose at least one product from Quick Order before submitting an enquiry.</p>
-                    <a class="button primary" href="/#products">Choose Products</a>
+                    <a class="button primary" href="/products/cups-cup-accessories">Choose Products</a>
                   </div>
                 </section>
                 """
-                return self.respond(layout("Request Quote", body, self.is_authed()))
+                return self.respond(layout("Request Quote", body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
             order_summary = f.get("order_summary") or f.get("product_interest") or ""
             delivery = f.get("delivery_suburb") or ""
             customer_message = f.get("message") or ""
@@ -498,7 +694,7 @@ Sitemap: {SITE_URL}/sitemap.xml
             quote_date = today.isoformat()
             email_sent = send_quotation_emails(quote_number, quote_date, f, selected)
             body = quotation_page(quote_number, quote_date, f, selected, email_sent)
-            return self.respond(layout("Quotation Draft", body, self.is_authed()))
+            return self.respond(layout("Quotation Draft", body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
         query = parse_qs(urlparse(self.path).query)
         items_value = query.get("items", [""])[0]
         selected = parse_quick_order_items(items_value)
@@ -547,5 +743,5 @@ Sitemap: {SITE_URL}/sitemap.xml
           </form>
         </section>
         """
-        self.respond(layout("Request Quote", body, self.is_authed()))
+        self.respond(layout("Request Quote", body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
 
