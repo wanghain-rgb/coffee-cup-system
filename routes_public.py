@@ -290,6 +290,12 @@ Sitemap: {SITE_URL}/sitemap.xml
               <a class="button primary" href="/products/cups-cup-accessories">Add Products to Quote</a>
             </div>
           </div>
+          <div class="partnership-mobile-card">
+            <p class="eyebrow">Packaging Partnership</p>
+            <h2>Reliable packaging for growing foodservice businesses.</h2>
+            <p>Supporting cafes, restaurants, takeaway and wholesale partners.</p>
+            <a class="button primary" href="/products/cups-cup-accessories">Add Products to Quote</a>
+          </div>
         </section>
 
         <script>
