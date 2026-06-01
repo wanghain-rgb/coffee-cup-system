@@ -399,6 +399,18 @@ Sitemap: {SITE_URL}/sitemap.xml
             </section>
             {notice}
             <section class="category-shop-layout">
+              <input class="category-filter-toggle" type="checkbox" id="category-filter-toggle" aria-label="Show product filters">
+              <div class="category-mobile-toolbar" aria-label="Product tools">
+                <label class="category-mobile-tool category-mobile-tool--filter" for="category-filter-toggle">Filter</label>
+                <label class="category-mobile-tool category-mobile-tool--sort">
+                  Sort
+                  <select aria-label="Sort products">
+                    <option>Best Match</option>
+                    <option>Size</option>
+                    <option>Wall Type</option>
+                  </select>
+                </label>
+              </div>
               {filters}
               <div class="category-results">
                 <div class="category-results__bar">
@@ -746,4 +758,3 @@ Sitemap: {SITE_URL}/sitemap.xml
         </section>
         """
         self.respond(layout("Request Quote", body, self.is_authed(), quote_cart_count=self.quote_cart_count()))
-
