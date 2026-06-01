@@ -2316,23 +2316,42 @@ th {
   }
 
   .partnership-banner {
-    min-height: 360px;
-    padding: 18px;
-    background-position: 36% center;
+    display: grid;
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+    background: none;
+  }
+
+  .partnership-banner::before {
+    content: "";
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 10;
+    background: url("/static/images/partnership-banner.webp") center / cover no-repeat;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .partnership-banner::after {
+    display: none;
   }
 
   .partnership-copy {
-    align-self: flex-end;
+    align-self: auto;
     max-width: 100%;
-    gap: 10px;
+    gap: 9px;
+    padding: 16px;
+    text-shadow: none;
   }
 
   .partnership-copy h2 {
-    font-size: clamp(26px, 7vw, 34px);
+    font-size: clamp(22px, 5.8vw, 28px);
+    line-height: 1.12;
   }
 
   .partnership-copy p:not(.eyebrow) {
-    font-size: 14px;
+    font-size: 13px;
+    line-height: 1.42;
   }
 }
 
@@ -4001,8 +4020,8 @@ th {
 
   .partnership-banner {
     justify-content: center;
-    min-height: 390px;
-    padding: 20px;
+    min-height: 0;
+    padding: 0;
   }
 
   .qo-footer {
@@ -4076,14 +4095,13 @@ th {
   }
 
   .partnership-banner {
-    min-height: 360px;
-    padding: 16px;
-    background-position: 38% center;
+    min-height: 0;
+    padding: 0;
   }
 
   .partnership-copy {
-    align-self: flex-end;
-    padding: 16px 0;
+    align-self: auto;
+    padding: 15px;
     max-width: 100%;
   }
 
