@@ -28,7 +28,7 @@ SECRET = os.environ.get("CUPFLOW_SECRET", "change-this-local-dev-secret")
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "admin123")
 SITE_URL = "https://aureapackaging.com.au"
-ASSET_VERSION = "20260531-bbc8be2"
+ASSET_VERSION = "20260601-mobile"
 PUBLIC_PHONE_DISPLAY = "0497 278 099"
 PUBLIC_PHONE_TEL = "0497278099"
 PUBLIC_EMAIL = "qiuchen.wang@bilinstone.com"
@@ -360,6 +360,12 @@ def layout(title, body, authed=False, noindex=False, quote_cart_count=0):
           <img class="brand-logo" src="/static/aurea-logo.webp" alt="AUREA Packaging Supply Pty Ltd" decoding="async">
           <span><strong>AUREA</strong><small>Packaging Supply Pty Ltd</small></span>
         </a>
+        <input class="mobile-nav-toggle" type="checkbox" id="mobile-nav-toggle" aria-label="Toggle navigation">
+        <label class="mobile-nav-button" for="mobile-nav-toggle" aria-label="Open mobile navigation">
+          <span></span>
+          <span></span>
+          <span></span>
+        </label>
         <nav class="site-nav">
           <a href="/">Home</a>
           <div class="nav-dropdown">
@@ -373,6 +379,14 @@ def layout(title, body, authed=False, noindex=False, quote_cart_count=0):
           <a href="/#contact">Contact</a>
           <a class="nav-cta" href="/quote">Request Quote</a>
           {admin_links}
+        </nav>
+        <nav class="mobile-nav" aria-label="Mobile navigation">
+          <a href="/">Home</a>
+          <a href="/#product-categories">Products</a>
+          <a href="/quote-cart" data-quote-cart-link>Quote Cart ({esc(quote_cart_count)})</a>
+          <a href="/#about">About Us</a>
+          <a href="/#contact">Contact</a>
+          <a class="mobile-nav-cta" href="/quote">Request Quote</a>
         </nav>
       </header>
       <main>{body}</main>
@@ -1444,5 +1458,3 @@ def quotation_page(quote_number, quote_date, form_data, selected, email_sent=Fal
       </div>
     </section>
     """
-
-
