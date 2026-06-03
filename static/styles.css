@@ -1,5 +1,6 @@
 :root {
-  --green-950: #031611;
+  --green-950-solid: #031611;
+  --green-950: rgba(3, 22, 17, 0.8);
   --green-900: #06241c;
   --green-850: #092d23;
   --green-800: #0d3b2f;
@@ -10,7 +11,7 @@
   --cream: #f7efe2;
   --paper: #fbf7ef;
   --white: #ffffff;
-  --ink: #12201a;
+  --ink: rgba(18, 32, 26, 0.8);
   --muted: #6d7a72;
   --line: rgba(216, 168, 77, 0.36);
   --panel: #ffffff;
@@ -77,7 +78,7 @@ a {
   object-fit: contain;
   flex: 0 0 auto;
   border-radius: 50%;
-  background: var(--green-950);
+  background: var(--green-950-solid);
 }
 
 .brand strong {
@@ -581,7 +582,7 @@ label {
   margin-top: 42px;
   padding: clamp(24px, 4vw, 42px);
   color: var(--white);
-  background: var(--green-950);
+  background: var(--green-950-solid);
   border: 1px solid var(--line);
   border-radius: 8px;
 }
@@ -872,7 +873,7 @@ textarea:disabled {
   margin: 52px auto 0;
   padding: clamp(24px, 4vw, 44px);
   color: var(--white);
-  background: linear-gradient(135deg, var(--green-900), var(--green-950));
+  background: linear-gradient(135deg, var(--green-900), var(--green-950-solid));
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
@@ -1091,7 +1092,7 @@ textarea:disabled {
   color: var(--white);
   background:
     linear-gradient(135deg, rgba(6, 36, 28, 0.96), rgba(13, 59, 47, 0.92)),
-    var(--green-950);
+    var(--green-950-solid);
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
@@ -1202,7 +1203,7 @@ textarea:disabled {
   color: var(--white);
   background:
     linear-gradient(135deg, rgba(13, 59, 47, 0.96), rgba(3, 22, 17, 0.98)),
-    var(--green-950);
+    var(--green-950-solid);
 }
 
 .quote-summary h2 {
@@ -2104,7 +2105,7 @@ th {
   .mobile-nav-button span {
     width: 20px;
     height: 2px;
-    background: var(--green-950);
+    background: var(--green-950-solid);
     border-radius: 999px;
   }
 
@@ -3208,7 +3209,7 @@ th {
   justify-content: center;
   padding: 9px 12px;
   color: #fffaf0;
-  background: var(--green-950);
+  background: var(--green-950-solid);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.08em;
@@ -3276,7 +3277,7 @@ th {
   margin-bottom: 26px;
   padding: 18px clamp(18px, 3vw, 34px);
   color: #fffaf0;
-  background: linear-gradient(90deg, var(--green-950), #0c4b3b);
+  background: linear-gradient(90deg, var(--green-950-solid), #0c4b3b);
 }
 
 .category-sale-strip strong {
@@ -4391,7 +4392,7 @@ th {
   }
 
   body {
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     background: #fff;
     font-size: 11px;
     line-height: 1.25;
@@ -4423,7 +4424,7 @@ th {
     display: flex;
     flex-direction: column;
     min-height: 281mm;
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-family: Arial, Helvetica, sans-serif;
   }
 
@@ -4461,7 +4462,7 @@ th {
   }
 
   .invoice-title-row h1 {
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-family: Arial, Helvetica, sans-serif;
     font-size: 22px;
     font-weight: 800;
@@ -4471,14 +4472,14 @@ th {
 
   .invoice-company {
     gap: 2px;
-    color: #222;
+    color: rgba(34, 34, 34, 0.8);
     font-size: 10.8px;
     line-height: 1.22;
     text-align: right;
   }
 
   .invoice-company strong {
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-size: 13.2px;
     letter-spacing: 0.02em;
   }
@@ -4509,7 +4510,7 @@ th {
 
   .invoice-meta dt,
   .invoice-meta dd {
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-size: 9.6px;
   }
 
@@ -4529,7 +4530,7 @@ th {
   .invoice-addresses h2,
   .invoice-payment h2 {
     margin-bottom: 3px;
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-family: Arial, Helvetica, sans-serif;
     font-size: 12px;
     font-weight: 800;
@@ -4538,13 +4539,13 @@ th {
   .invoice-addresses p,
   .invoice-payment p {
     margin-top: 2px;
-    color: #333;
+    color: rgba(51, 51, 51, 0.8);
     font-size: 10.2px;
     line-height: 1.2;
   }
 
   .invoice-addresses p:first-of-type {
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-size: 10.8px;
     font-weight: 800;
   }
@@ -4565,7 +4566,7 @@ th {
   .invoice-totals div {
     padding: 5px 7px;
     border-bottom: 0;
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-size: 11.2px;
     font-weight: 700;
   }
@@ -4582,7 +4583,7 @@ th {
   table {
     width: 100%;
     min-width: 0;
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-size: 9.4px;
     border-color: #d7d7d7;
     table-layout: fixed;
@@ -4603,7 +4604,7 @@ th {
 
   th {
     background: #f3f3f3;
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-weight: 800;
     white-space: nowrap;
   }
@@ -4748,7 +4749,7 @@ th {
   }
 
   .invoice-payment-grid strong {
-    color: #111;
+    color: rgba(17, 17, 17, 0.8);
     font-size: 9.8px;
   }
 
@@ -4775,7 +4776,7 @@ th {
     margin-top: 6px;
     padding-top: 4px;
     border-top: 1px solid #d7d7d7;
-    color: #333;
+    color: rgba(51, 51, 51, 0.8);
     font-size: 9.4px;
     text-align: center;
   }
