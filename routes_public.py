@@ -197,10 +197,15 @@ Sitemap: {SITE_URL}/sitemap.xml
         self.respond(content, content_type="text/plain")
 
     def sitemap_xml(self):
+        category_urls = "\n".join(
+            f"  <url><loc>{SITE_URL}{category['href']}</loc></url>"
+            for category in PRODUCT_CATEGORIES
+        )
         content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>{SITE_URL}/</loc></url>
   <url><loc>{SITE_URL}/quote</loc></url>
+{category_urls}
 </urlset>
 """
         self.respond(content, content_type="application/xml")
